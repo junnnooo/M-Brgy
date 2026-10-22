@@ -2,12 +2,25 @@ import "dotenv/config";
 import { supabase } from "../utils/supabase.js";
 
 // Parse Command Line: Arguments for email, password, first name, last name, 
-//                     barangay ID, and optional role ID (defaulting to 3 for Admin)
+//                     barangay ID (10-digit PSGC code), and optional role ID (defaulting to 3 for Admin)
 const [email, password, firstName, lastName, brgyId, roleId = "3"] = process.argv.slice(2);
 
 // Simple Logic: If any required argument is missing, print usage instructions and exit with an error code.
 if (!email || !password || !firstName || !lastName || !brgyId) {
-  console.error("Usage: node scripts/create-admin.js <email> <password> <first name> <last name> <brgy_id> [role_id]");
+  console.error("Usage: node scripts/create-admin.js <email> <password> <first name> <last name> <brgy_id (10-digit PSGC code)> [role_id: 2=Staff, 3=Admin]");
+  process.exit(1);
+}
+
+// Validation: brgy_id is now a 10-digit PSGC code kept as text (leading zero matters).
+//             Keep it as a string; never convert it with Number().
+if (!/^[0-9]{10}$/.test(brgyId)) {
+  console.error("brgy_id must be the 10-digit PSGC code, e.g. 0402104012");
+  process.exit(1);
+}
+
+// Validation: this script only creates Staff (2) or Admin (3). Owner (4) is assigned manually.
+if (!["2", "3"].includes(roleId)) {
+  console.error("role_id must be 2 (Staff) or 3 (Admin). Owner accounts are set manually.");
   process.exit(1);
 }
 
@@ -35,7 +48,7 @@ const { error: profileError } = await supabase.from("accounts").upsert(
     contact_number: "",
     verification_status: "Verified",
     verified_at: new Date().toISOString(),
-    brgy_id: Number(brgyId),
+    brgy_id: brgyId,
     role_id: Number(roleId),
   },
   { onConflict: "account_id" },
@@ -48,4 +61,4 @@ if (profileError) {
 
 // Success: Log a message indicating that the account was created successfully,
 //          specifying whether it is an admin or staff account based on the role ID.
-console.log(`Created ${Number(roleId) >= 3 ? "admin" : "staff"} account for ${email}`);
+console.log(`Created ${roleId === "2" ? "staff" : "admin"} account for ${email}`);
