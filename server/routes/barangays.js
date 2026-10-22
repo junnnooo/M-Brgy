@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
-import { canTouchBarangay, check, httpError, numericId } from "../utils/helpers.js";
+import { canTouchBarangay, check, httpError } from "../utils/helpers.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
 // Barangay settings: name, hall address, office hours
 router.patch("/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = numericId(req.params.id, "Barangay");
+  const id = String(req.params.id); // 10-digit text code, never a number
+  if (!/^\d{10}$/.test(id)) throw httpError(404, "Barangay not found.");
   if (!canTouchBarangay(req.account, id)) throw httpError(403, "You can only edit your own barangay.");
 
   const { brgy_name, address, office_hours } = req.body ?? {};

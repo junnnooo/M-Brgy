@@ -38,7 +38,15 @@ router.post("/signup", async (req, res) => {
     throw httpError(400, "Please fill in every field.");
   }
   if (password.length < 6) throw httpError(400, "Use a password with at least 6 characters.");
-  if (!Number.isInteger(Number(brgy_id))) throw httpError(400, "Please choose your barangay.");
+
+  // Location IDs are 10-digit codes that start with 0, so keep them as strings (never Number()).
+  const brgyId = String(brgy_id ?? "").trim();
+  if (!/^\d{10}$/.test(brgyId)) throw httpError(400, "Please choose your barangay.");
+
+  const barangay = check(
+    await supabase.from("barangays").select("brgy_id").eq("brgy_id", brgyId).maybeSingle(),
+  );
+  if (!barangay) throw httpError(400, "That barangay doesn't exist.");
 
   const cleanEmail = email.trim().toLowerCase();
   const { data, error } = await supabase.auth.admin.createUser({
@@ -61,7 +69,7 @@ router.post("/signup", async (req, res) => {
       address: "",
       contact_number: "",
       verification_status: PENDING,
-      brgy_id: Number(brgy_id),
+      brgy_id: brgyId,
       role_id: RESIDENT_ROLE_ID,
     },
     { onConflict: "account_id" },

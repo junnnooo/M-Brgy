@@ -20,7 +20,7 @@ const toAlert = (a) => ({
 
 router.get("/", async (req, res) => {
   let query = supabase.from("alerts").select("*").order("starts_at", { ascending: false });
-  if (req.query.brgy_id) query = query.eq("brgy_id", Number(req.query.brgy_id));
+  if (req.query.brgy_id) query = query.eq("brgy_id", String(req.query.brgy_id));
   res.json(check(await query).map(toAlert));
 });
 
@@ -35,7 +35,7 @@ router.post("/", requireAuth, requireStaff, async (req, res) => {
       .insert({
         title: title.trim(),
         message: body.trim(),
-        severity: "Emergency",
+        severity: "Critical", // the alerts table only accepts Info / Warning / Critical
         starts_at: new Date().toISOString(),
         brgy_id: req.account.brgy_id,
         sent_by: req.account.account_id,

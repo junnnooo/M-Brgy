@@ -14,12 +14,13 @@ const toAnnouncement = (a) => ({
   date: toDay(a.published_at),
 });
 
-// Public: GET /api/announcements?brgy_id=4
+// Public: GET /api/announcements?brgy_id=0402104015
 router.get("/", async (req, res) => {
   let query = supabase.from("announcements").select("*").order("published_at", { ascending: false });
-  if (req.query.brgy_id) query = query.eq("brgy_id", Number(req.query.brgy_id));
+  if (req.query.brgy_id) query = query.eq("brgy_id", String(req.query.brgy_id));
   res.json(check(await query).map(toAnnouncement));
 });
+
 
 router.post("/", requireAuth, requireStaff, async (req, res) => {
   const { title, type, body, date } = req.body ?? {};

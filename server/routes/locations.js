@@ -4,9 +4,7 @@ import { check } from "../utils/helpers.js";
 
 const router = Router();
 
-// Location Dropdown: This endpoint provides a hierarchical list of provinces, their municipalities, 
-//                    and the barangays within those municipalities. It is intended for public access, 
-//                    such as on the sign-up page where users need to select their location.
+// Location dropdown: provinces -> municipalities -> barangays, for public pages like sign-up.
 router.get("/", async (req, res) => {
   const provinces = check(
     await supabase
@@ -14,9 +12,14 @@ router.get("/", async (req, res) => {
       .select("province_id, province_name, municipalities(municipality_id, municipality_name, barangays(brgy_id, brgy_name))")
       .order("province_name"),
   );
+
+  // Order barangays by the number in their name (Barangay 1, 2, ... 14), then by name.
+  const num = (b) => Number(b.brgy_name.match(/\d+/)?.[0] ?? Infinity);
   for (const p of provinces) {
     p.municipalities.sort((a, b) => a.municipality_name.localeCompare(b.municipality_name));
-    for (const m of p.municipalities) m.barangays.sort((a, b) => a.brgy_id - b.brgy_id);
+    for (const m of p.municipalities) {
+      m.barangays.sort((a, b) => num(a) - num(b) || a.brgy_name.localeCompare(b.brgy_name));
+    }
   }
   res.json(provinces);
 });

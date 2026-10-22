@@ -4,10 +4,10 @@ import { check } from "../utils/helpers.js";
 
 const router = Router();
 
-// Documents a barangay currently offers: GET /api/services?brgy_id=4
+// Documents a barangay currently offers: GET /api/services?brgy_id=0402104015
 router.get("/", async (req, res) => {
-  const brgyId = Number(req.query.brgy_id);
-  if (!Number.isInteger(brgyId)) return res.json([]);
+  const brgyId = String(req.query.brgy_id ?? "");
+  if (!/^\d{10}$/.test(brgyId)) return res.json([]);
   const rows = check(
     await supabase
       .from("service_types")
