@@ -6,6 +6,15 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 1.0.3-d
+(+ | ~) Added and Updated new "old-prototype" for preparation for the emergency update
+
+(* | ~) Prividous Bug in the Residents Panel, Mobile Bus, is still not resolved
+(*) New Bug, Reseidents View, Notifications in the incident/consernt report is not comming though
+        Discovered: The notification being updated is the "Verified account"
+
+Mini-Update to incorporate the new elements in preparation for the migration of new Client designs
+
 ## Version: 1.0.3-c
 (↑ | ~) Updated and Fixed Bugs that is present in client files
 (↑ | ~) Updated and Fixed Bugs that is present in routes files

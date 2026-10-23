@@ -697,8 +697,7 @@ createApp({
       if (m < 1) return "Just now";
       if (m < 60) return `${m}m ago`;
       const h = Math.floor(m / 60);
-      if (h == 1) return `${h}h ago`;
-      if (h < 24) return `${h}hs ago`;
+      if (h < 24) return `${h}h ago`;
       return this.formatDate(new Date(ts).toISOString().slice(0, 10));
     },
     notify(msg) {
