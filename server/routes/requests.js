@@ -5,10 +5,18 @@ import {
   numericId, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { notifyAccount } from "../utils/notify.js";
 
 const router = Router();
 const SELECT = `*, service_types(service_name, fee), ${PLACE_SELECT}`;
 const STATUSES = ["Pending", "Approved", "Ready for Pickup", "Completed", "Rejected"];
+const STATUS_MESSAGES = {
+  Pending: "is back to pending review.",
+  Approved: "has been approved.",
+  "Ready for Pickup": "is ready. Please visit the barangay hall to pick it up.",
+  Completed: "has been completed.",
+  Rejected: "was rejected. Visit the barangay hall for details.",
+};
 
 const toRequest = (r, people = {}) => {
   const a = people[r.submitted_by];
@@ -22,6 +30,8 @@ const toRequest = (r, people = {}) => {
     time: formatTime(r.appointment_time),
     status: r.status,
     created: toDay(r.created_at),
+    updated: toDay(r.updated_at ?? r.ready_at ?? r.created_at),
+    archived: Boolean(r.archived_at),
     name: fullName(a),
     email: a?.email ?? "",
     contact: a?.contact_number ?? "",
@@ -34,7 +44,7 @@ const withPeople = async (rows) => {
   return rows.map((r) => toRequest(r, people));
 };
 
-// Resident: my own requests
+// Resident: my own requests (archived ones included, residents can still track them)
 router.get("/mine", requireAuth, async (req, res) => {
   const rows = check(
     await supabase
@@ -53,6 +63,19 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
     req.account,
   );
   res.json(await withPeople(check(await query)));
+});
+
+// Track a Request: anyone can look up a request by its ID, but only the submitter or staff of the barangay can see it.
+//                  Either DOC-## for Documents or REQ-## for Reports
+router.get("/:id", requireAuth, async (req, res) => {
+  const id = numericId(req.params.id, "Request");
+  const request = check(await supabase.from("requests").select(SELECT).eq("request_id", id).maybeSingle());
+  const allowed =
+    request &&
+    (request.submitted_by === req.account.account_id ||
+      (req.isStaff && canTouchBarangay(req.account, request.brgy_id)));
+  if (!allowed) throw httpError(404, "Request not found.");
+  res.json((await withPeople([request]))[0]);
 });
 
 router.post("/", requireAuth, async (req, res) => {
@@ -97,30 +120,55 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
 
   const existing = check(
-    await supabase.from("requests").select("request_id, brgy_id, submitted_by").eq("request_id", id).maybeSingle(),
+    await supabase
+      .from("requests")
+      .select("request_id, brgy_id, submitted_by, status")
+      .eq("request_id", id)
+      .maybeSingle(),
   );
   if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
     throw httpError(404, "Request not found.");
   }
 
+  const changed = existing.status !== status;
   const patch = { status, processed_by: req.account.account_id };
-  const ready = status === "Ready for Pickup";
-  if (ready) patch.ready_at = new Date().toISOString();
+  if (changed && status === "Ready for Pickup") patch.ready_at = new Date().toISOString();
 
   const updated = check(
     await supabase.from("requests").update(patch).eq("request_id", id).select(SELECT).single(),
   );
 
-  if (ready) {
-    check(
-      await supabase.from("notifications").insert({
-        message: `${updated.service_types?.service_name ?? "Your document"} (DOC-${id}) is ready. Please visit the barangay hall.`,
-        is_read: false,
-        account_id: existing.submitted_by,
-        request_id: id,
-      }),
+  if (changed) {
+    await notifyAccount(
+      existing.submitted_by,
+      `${updated.service_types?.service_name ?? "Your document"} (DOC-${id}) ${STATUS_MESSAGES[status]}`,
+      { requestId: id },
     );
   }
+  res.json((await withPeople([updated]))[0]);
+});
+
+// Staff: move a request out of the active list (or back). Needs requests.archived_at (1.0.3 migration).
+router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+  const id = numericId(req.params.id, "Request");
+  const { archived } = req.body ?? {};
+  if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");
+
+  const existing = check(
+    await supabase.from("requests").select("request_id, brgy_id").eq("request_id", id).maybeSingle(),
+  );
+  if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
+    throw httpError(404, "Request not found.");
+  }
+
+  const updated = check(
+    await supabase
+      .from("requests")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("request_id", id)
+      .select(SELECT)
+      .single(),
+  );
   res.json((await withPeople([updated]))[0]);
 });
 

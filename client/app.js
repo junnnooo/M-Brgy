@@ -35,7 +35,7 @@ createApp({
       resident: blankResident(),
       settings: defaultSettings(),
 
-      // data from the API
+      // Data Lists: loaded from the API on boot or when the barangay changes
       locations: [],
       services: [],
       posts: [],
@@ -58,9 +58,22 @@ createApp({
       documentForm: blankDocumentForm(),
       reportForm: blankReportForm(),
       postForm: blankPost(),
+
+      // admin tables: search by email + Active / Archived views
+      verifSearch: "",
+      docSearch: "",
+      reportSearch: "",
+      docView: "active",
+      reportView: "active",
+
+      // Track Status: one lookup for either a document request (DOC-) or a concern report (REP-)
       trackId: "",
       trackSearched: false,
-      trackedReport: null,
+      trackLoading: false,
+      trackSeq: 0,
+      trackedItem: null,
+
+      notifOpen: false,
       modal: "",
       modalTitle: "",
       modalMessage: "",
@@ -99,7 +112,7 @@ createApp({
             });
       return list;
     },
-    // Announcements and emergency alerts are separate tables; the UI treats them as one board.
+// Table Separation: Announcements, Requests, Reports, Profiles
     announcements() {
       return [...this.posts, ...this.alerts].sort((a, b) => b.date.localeCompare(a.date));
     },
@@ -116,7 +129,6 @@ createApp({
         ) || null
       );
     },
-    // For residents the API only returns their own records.
     residentRequests() {
       return this.requests;
     },
@@ -126,6 +138,9 @@ createApp({
     residentNotifications() {
       return this.notifications;
     },
+    unreadCount() {
+      return this.notifications.filter((n) => !n.read).length;
+    },
     filteredAnnouncements() {
       return this.announcements.filter(
         (a) => this.announcementFilter === "All" || a.type === this.announcementFilter,
@@ -134,16 +149,41 @@ createApp({
     pendingResidents() {
       return this.profiles.filter((p) => !p.verified);
     },
+    activeRequests() {
+      return this.requests.filter((r) => !r.archived);
+    },
+    archivedRequests() {
+      return this.requests.filter((r) => r.archived);
+    },
+    activeReports() {
+      return this.reports.filter((r) => !r.archived);
+    },
+    archivedReports() {
+      return this.reports.filter((r) => r.archived);
+    },
     pendingRequests() {
-      return this.requests.filter((r) => r.status === "Pending");
+      return this.activeRequests.filter((r) => r.status === "Pending");
     },
     openReports() {
-      return this.reports.filter((r) => r.status !== "Resolved");
+      return this.activeReports.filter((r) => r.status !== "Resolved");
+    },
+    filteredProfiles() {
+      return this.profiles.filter((p) => this.matches(this.verifSearch, [p.email, p.name, p.address]));
     },
     filteredRequests() {
-      return this.requests.filter(
-        (r) => this.requestFilter === "All" || r.status === this.requestFilter,
+      const list = this.docView === "archived" ? this.archivedRequests : this.activeRequests;
+      return list.filter(
+        (r) =>
+          (this.requestFilter === "All" || r.status === this.requestFilter) &&
+          this.matches(this.docSearch, [r.email, r.name, r.ref]),
       );
+    },
+    filteredReports() {
+      const list = this.reportView === "archived" ? this.archivedReports : this.activeReports;
+      return list.filter((r) => this.matches(this.reportSearch, [r.email, r.name, r.ref]));
+    },
+    documentStatuses() {
+      return ["Pending", "Approved", "Ready for Pickup", "Completed"];
     },
     reportStatuses() {
       return ["Submitted", "Received", "In Progress", "Resolved"];
@@ -160,7 +200,7 @@ createApp({
     },
   },
   methods: {
-    // The Session: On boot, check if the user is logged in and load their session data, 
+    // The Session: On boot, check if the user is logged in and load their session data,
     //              including their profile and related records. If the access token is invalid, clear it and reset the user state.
     async boot() {
       api.onAuthLost = () => this.logout();
@@ -254,6 +294,26 @@ createApp({
     },
     statusIndex(s) {
       return this.reportStatuses.indexOf(s);
+    },
+    docStatusIndex(s) {
+      return this.documentStatuses.indexOf(s);
+    },
+    // Case-insensitive "contains" across the given fields; an empty query matches everything.
+    matches(query, fields) {
+      const q = (query || "").trim().toLowerCase();
+      if (!q) return true;
+      return fields.some((f) => (f || "").toLowerCase().includes(q));
+    },
+    timeAgo(iso) {
+      const t = iso ? new Date(iso).getTime() : NaN;
+      if (Number.isNaN(t)) return "";
+      const m = Math.floor((Date.now() - t) / 60000);
+      if (m < 1) return "Just now";
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h == 1) return "1h ago";
+      if (h < 24) return `${h}h ago`;
+      return this.formatDate(new Date(t).toISOString().slice(0, 10));
     },
     notify(msg) {
       this.toast = msg;
@@ -378,7 +438,12 @@ createApp({
       this.reportForm = blankReportForm();
       this.trackId = "";
       this.trackSearched = false;
-      this.trackedReport = null;
+      this.trackLoading = false;
+      this.trackedItem = null;
+      this.trackSeq++;
+      this.notifOpen = false;
+      this.verifSearch = this.docSearch = this.reportSearch = "";
+      this.docView = this.reportView = "active";
       this.page = "home";
       this.adminPage = "overview";
       this.authView = wasAdmin ? "admin" : "resident";
@@ -419,9 +484,10 @@ createApp({
         this.requests.unshift(r);
         this.modalTitle = "Request submitted";
         this.modalMessage =
-          "Your document request has been sent to the barangay. Keep the reference number to follow up.";
+          "Your document request has been sent to the barangay. Keep the reference number and use Track Status to follow its progress.";
         this.modalRef = r.ref;
-        this.modalNext = "documents";
+        this.modalNext = "track";
+        this.trackId = r.ref;
         this.modal = "success";
         this.documentForm = blankDocumentForm();
         this.prepareForm(this.documentForm);
@@ -459,15 +525,34 @@ createApp({
         this.notify(e.message);
       }
     },
+
+    // Track Status: DOC-<n> looks up a document request, REP-<n> a concern report.
+    //               A bare number could be either, so it tries the report first and then the request.
     async trackSearch() {
+      const seq = ++this.trackSeq;
       this.trackSearched = true;
-      this.trackedReport = null;
-      const n = parseInt(String(this.trackId).replace(/\D/g, ""), 10);
+      this.trackedItem = null;
+      const raw = String(this.trackId).trim().toUpperCase();
+      const n = parseInt(raw.replace(/\D/g, ""), 10);
       if (!n) return;
+
+      const kinds = raw.startsWith("DOC") ? ["document"] : raw.startsWith("REP") ? ["report"] : ["report", "document"];
+      this.trackLoading = true;
       try {
-        this.trackedReport = await api.get(`/reports/${n}`);
-      } catch (e) {
-        if (e.status !== 404) this.notify(e.message);
+        for (const kind of kinds) {
+          try {
+            const data = await api.get(kind === "report" ? `/reports/${n}` : `/requests/${n}`);
+            if (seq === this.trackSeq) this.trackedItem = { kind, data };
+            return;
+          } catch (e) {
+            if (e.status !== 404) {
+              if (seq === this.trackSeq) this.notify(e.message);
+              return;
+            }
+          }
+        }
+      } finally {
+        if (seq === this.trackSeq) this.trackLoading = false;
       }
     },
 
@@ -489,10 +574,55 @@ createApp({
         this.notify(e.message);
       }
     },
-    async dismissNotifications() {
+
+    // Residents Notifications (the bell):
+    async loadNotifications() {
+      if (this.role !== "resident") return;
       try {
-        await api.post("/notifications/dismiss");
+        this.notifications = await api.get("/notifications");
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+    toggleNotifications() {
+      this.notifOpen = !this.notifOpen;
+      if (this.notifOpen) this.loadNotifications();
+    },
+    async markAllRead() {
+      try {
+        await api.post("/notifications/read-all");
+        this.notifications.forEach((n) => (n.read = true));
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+    async openNotification(n) {
+      this.notifOpen = false;
+      const wasUnread = !n.read;
+      n.read = true;
+      if (n.ref) {
+        this.trackId = n.ref;
+        this.page = "track";
+        this.trackSearch();
+      } else if (n.kind === "alert") {
+        this.page = "announcements";
+      } else if (n.kind === "account") {
+        this.page = "account";
+      }
+      window.scrollTo({ top: 0 });
+      if (!wasUnread) return;
+      try {
+        await api.post(`/notifications/${n.id}/read`);
+      } catch (e) {
+        n.read = false;
+        this.notify(e.message);
+      }
+    },
+    async clearNotifications() {
+      try {
+        await api.del("/notifications");
         this.notifications = [];
+        this.notifOpen = false;
       } catch (e) {
         this.notify(e.message);
       }
@@ -524,6 +654,19 @@ createApp({
         this.notify("Concern report status updated");
       } catch (e) {
         if (evt) evt.target.value = r.status;
+        this.notify(e.message);
+      }
+    },
+    async toggleArchive(item, kind) {
+      const isDoc = kind === "document";
+      const label = isDoc ? "Document request" : "Concern report";
+      try {
+        Object.assign(
+          item,
+          await api.patch(`/${isDoc ? "requests" : "reports"}/${item.id}/archive`, { archived: !item.archived }),
+        );
+        this.notify(item.archived ? `${label} archived` : `${label} restored from archive`);
+      } catch (e) {
         this.notify(e.message);
       }
     },
@@ -589,6 +732,13 @@ createApp({
     },
   },
   mounted() {
+    document.addEventListener("click", (e) => {
+      if (this.notifOpen && !e.target.closest(".notif-wrap")) this.notifOpen = false;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.notifOpen = false;
+    });
+    setInterval(() => this.loadNotifications(), 60000);
     this.boot();
   },
 }).mount("#app");

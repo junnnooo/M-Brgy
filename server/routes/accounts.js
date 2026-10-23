@@ -4,6 +4,7 @@ import {
   canTouchBarangay, check, fullName, httpError, PENDING, VERIFIED, scopeToBarangay,
 } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { notifyAccount } from "../utils/notify.js";
 
 const router = Router();
 const RESIDENT_ROLE_ID = 1;
@@ -31,7 +32,11 @@ router.patch("/:id/verification", requireAuth, requireStaff, async (req, res) =>
   if (typeof verified !== "boolean") throw httpError(400, "Send { verified: true } or { verified: false }.");
 
   const existing = check(
-    await supabase.from("accounts").select("account_id, brgy_id").eq("account_id", req.params.id).maybeSingle(),
+    await supabase
+      .from("accounts")
+      .select("account_id, brgy_id, verification_status")
+      .eq("account_id", req.params.id)
+      .maybeSingle(),
   );
   if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
     throw httpError(404, "Resident not found.");
@@ -48,6 +53,15 @@ router.patch("/:id/verification", requireAuth, requireStaff, async (req, res) =>
       .select()
       .single(),
   );
+
+  if ((existing.verification_status === VERIFIED) !== verified) {
+    await notifyAccount(
+      existing.account_id,
+      verified
+        ? "Your resident account has been verified. You can now request documents."
+        : "Your resident verification was revoked. Please visit the barangay hall.",
+    );
+  }
   res.json(toProfile(updated));
 });
 

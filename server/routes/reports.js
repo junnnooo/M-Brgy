@@ -5,24 +5,30 @@ import {
   placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { notifyAccount } from "../utils/notify.js";
 
 const router = Router();
 const SELECT = `*, ${PLACE_SELECT}`;
 const STATUSES = ["Submitted", "Received", "In Progress", "Resolved"];
 
-const toReport = (r, people = {}) => ({
-  id: r.report_id,
-  ref: `REP-${r.report_id}`,
-  category: r.category,
-  title: r.title,
-  description: r.description,
-  location: r.location_details,
-  status: r.status,
-  created: toDay(r.created_at),
-  updated: toDay(r.created_at),
-  name: fullName(people[r.account_id]),
-  ...placeOf(r),
-});
+const toReport = (r, people = {}) => {
+  const a = people[r.account_id];
+  return {
+    id: r.report_id,
+    ref: `REP-${r.report_id}`,
+    category: r.category,
+    title: r.title,
+    description: r.description,
+    location: r.location_details,
+    status: r.status,
+    created: toDay(r.created_at),
+    updated: toDay(r.created_at),
+    archived: Boolean(r.archived_at),
+    name: fullName(a),
+    email: a?.email ?? "",
+    ...placeOf(r),
+  };
+};
 
 const withPeople = async (rows) => {
   const people = await accountsById(rows.map((r) => r.account_id));
@@ -31,14 +37,19 @@ const withPeople = async (rows) => {
 
 const logUpdate = async (reportId, status, remark, accountId) =>
   check(
-    await supabase.from("report_updates").insert({
-      status,
-      remark,
-      report_id: reportId,
-      updated_by: accountId,
-    }),
+    await supabase
+      .from("report_updates")
+      .insert({
+        status,
+        remark,
+        report_id: reportId,
+        updated_by: accountId,
+      })
+      .select("update_id")
+      .single(),
   );
 
+// Resident: my own reports (archived ones included, residents can still track them)
 router.get("/mine", requireAuth, async (req, res) => {
   const rows = check(
     await supabase
@@ -109,7 +120,11 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
 
   const existing = check(
-    await supabase.from("reports").select("report_id, brgy_id").eq("report_id", id).maybeSingle(),
+    await supabase
+      .from("reports")
+      .select("report_id, brgy_id, account_id, status")
+      .eq("report_id", id)
+      .maybeSingle(),
   );
   if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
     throw httpError(404, "Report not found.");
@@ -118,10 +133,42 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const updated = check(
     await supabase.from("reports").update({ status }).eq("report_id", id).select(SELECT).single(),
   );
-  await logUpdate(id, status, remark?.trim() || `Status changed to ${status}.`, req.account.account_id);
+  const log = await logUpdate(id, status, remark?.trim() || `Status changed to ${status}.`, req.account.account_id);
+
+  if (existing.status !== status) {
+    await notifyAccount(
+      existing.account_id,
+      `Your report "${updated.category}" (REP-${id}) is now ${status}.`,
+      { updateId: log.update_id },
+    );
+  }
   const result = (await withPeople([updated]))[0];
   result.updated = toDay(new Date().toISOString());
   res.json(result);
+});
+
+// Staff: move a report out of the active list (or back). Needs reports.archived_at (1.0.3 migration).
+router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+  const id = numericId(req.params.id, "Report");
+  const { archived } = req.body ?? {};
+  if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");
+
+  const existing = check(
+    await supabase.from("reports").select("report_id, brgy_id").eq("report_id", id).maybeSingle(),
+  );
+  if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
+    throw httpError(404, "Report not found.");
+  }
+
+  const updated = check(
+    await supabase
+      .from("reports")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("report_id", id)
+      .select(SELECT)
+      .single(),
+  );
+  res.json((await withPeople([updated]))[0]);
 });
 
 export default router;

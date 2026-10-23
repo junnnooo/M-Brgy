@@ -83,7 +83,11 @@ createApp({
         municipality: "C",
         barangay: "",
       },
-      trackForm: { province: "", municipality: "", barangay: "" },
+      verifSearch: "",
+      docSearch: "",
+      reportSearch: "",
+      docView: "active",
+      reportView: "active",
       postForm: {
         title: "",
         type: "Announcement",
@@ -96,6 +100,7 @@ createApp({
       modalTitle: "",
       modalMessage: "",
       modalRef: "",
+      notifOpen: false,
       modalNext: "home",
       toast: "",
       showPostForm: false,
@@ -128,9 +133,13 @@ createApp({
       );
     },
     residentNotifications() {
-      return this.notifications.filter((n) =>
-        this.sameEmail(n.email, this.resident.email),
-      );
+      return this.notifications
+        .filter((n) => this.sameEmail(n.email, this.resident.email))
+        .slice()
+        .sort((a, b) => (b.created || b.id) - (a.created || a.id));
+    },
+    unreadCount() {
+      return this.residentNotifications.filter((n) => !n.read).length;
     },
     filteredAnnouncements() {
       return this.announcements
@@ -145,23 +154,57 @@ createApp({
     pendingResidents() {
       return this.profiles.filter((p) => !p.verified);
     },
+    activeRequests() {
+      return this.requests.filter((r) => !r.archived);
+    },
+    archivedRequests() {
+      return this.requests.filter((r) => r.archived);
+    },
+    activeReports() {
+      return this.reports.filter((r) => !r.archived);
+    },
+    archivedReports() {
+      return this.reports.filter((r) => r.archived);
+    },
     pendingRequests() {
-      return this.requests.filter((r) => r.status === "Pending");
+      return this.activeRequests.filter((r) => r.status === "Pending");
     },
     openReports() {
-      return this.reports.filter((r) => r.status !== "Resolved");
+      return this.activeReports.filter((r) => r.status !== "Resolved");
+    },
+    filteredProfiles() {
+      return this.profiles.filter((p) =>
+        this.matches(this.verifSearch, [p.email, p.name, p.address]),
+      );
     },
     filteredRequests() {
-      return this.requests.filter(
-        (r) => this.requestFilter === "All" || r.status === this.requestFilter,
+      const list =
+        this.docView === "archived" ? this.archivedRequests : this.activeRequests;
+      return list.filter(
+        (r) =>
+          (this.requestFilter === "All" || r.status === this.requestFilter) &&
+          this.matches(this.docSearch, [r.email, r.name, r.id]),
       );
     },
-    trackedReport() {
-      return (
-        this.reports.find(
-          (r) => r.id.toLowerCase() === this.trackId.trim().toLowerCase(),
-        ) || null
+    filteredReports() {
+      const list =
+        this.reportView === "archived" ? this.archivedReports : this.activeReports;
+      return list.filter((r) =>
+        this.matches(this.reportSearch, [r.email, r.name, r.id]),
       );
+    },
+    /* resident tracking: looks up the resident's own document requests and concern reports */
+    trackedItem() {
+      const key = this.trackId.trim().toLowerCase();
+      if (!key) return null;
+      const doc = this.residentRequests.find((r) => r.id.toLowerCase() === key);
+      if (doc) return { kind: "document", data: doc };
+      const rep = this.residentReports.find((r) => r.id.toLowerCase() === key);
+      if (rep) return { kind: "report", data: rep };
+      return null;
+    },
+    documentStatuses() {
+      return ["Pending", "Approved", "Ready for Pickup", "Completed"];
     },
     reportStatuses() {
       return ["Submitted", "Received", "In Progress", "Resolved"];
@@ -260,6 +303,14 @@ createApp({
     },
     statusIndex(s) {
       return this.reportStatuses.indexOf(s);
+    },
+    docStatusIndex(s) {
+      return this.documentStatuses.indexOf(s);
+    },
+    matches(query, fields) {
+      const q = (query || "").trim().toLowerCase();
+      if (!q) return true;
+      return fields.some((f) => (f || "").toLowerCase().includes(q));
     },
     blankResident() {
       return { name: "", email: "", address: "", contact: "", verified: false };
@@ -376,6 +427,7 @@ createApp({
       this.authView = this.role || "resident";
       this.authMode = "login";
       this.session = null;
+      this.notifOpen = false;
       this.resident = this.blankResident();
       this.reportForm.name = "";
       this.documentForm.contact = "";
@@ -395,12 +447,6 @@ createApp({
     },
     openDocument() {
       this.page = "documents";
-      this.documentForm.contact = this.resident.contact || "";
-    },
-    openAppointment() {
-      this.page = "documents";
-      this.documentForm.type = "Barangay Clearance";
-      this.documentForm.purpose = "Appointment / document processing";
       this.documentForm.contact = this.resident.contact || "";
     },
     submitDocument() {
@@ -428,9 +474,10 @@ createApp({
       this.persist();
       this.modalTitle = "Request submitted";
       this.modalMessage =
-        "Your document request has been recorded in this browser. Keep the reference number to follow up with the barangay.";
+        "Your document request has been recorded. Keep the reference number and use Track Status to follow its progress.";
       this.modalRef = r.id;
-      this.modalNext = "documents";
+      this.modalNext = "track";
+      this.trackId = r.id;
       this.modal = "success";
       this.documentForm = {
         type: "",
@@ -508,6 +555,15 @@ createApp({
       if (i >= 0) this.profiles.splice(i, 1, { ...p });
       if (this.sameEmail(p.email, this.resident.email))
         this.resident.verified = p.verified;
+      this.pushNotification(
+        p.email,
+        p.verified ? "Account verified" : "Verification revoked",
+        p.verified
+          ? "Your resident account has been verified. You can now request documents."
+          : "Your resident verification was revoked. Please visit the barangay hall.",
+        "account",
+        "",
+      );
       this.persist();
       this.notify(
         p.verified ? "Resident marked verified" : "Verification revoked",
@@ -515,24 +571,49 @@ createApp({
     },
     /* update requestt */
     updateRequest(r, status) {
+      if (r.status === status) return;
       r.status = status;
       r.updated = todayString();
-      if (status === "Ready for Pickup")
-        this.notifications.push({
-          id: Date.now(),
-          email: r.email,
-          title: "Your document is ready for pickup",
-          body: `${r.type} (${r.id}) is ready. Please visit the barangay hall.`,
-        });
+      const msg = {
+        Pending: "is back to pending review.",
+        Approved: "has been approved.",
+        "Ready for Pickup": "is ready. Please visit the barangay hall to pick it up.",
+        Completed: "has been completed.",
+        Rejected: "was rejected. Visit the barangay hall for details.",
+      }[status];
+      this.pushNotification(
+        r.email,
+        `Document request: ${status}`,
+        `${r.type} (${r.id}) ${msg}`,
+        "document",
+        r.id,
+      );
       this.persist();
       this.notify("Document request updated");
     },
     /* update reportt */
     updateReport(r, status) {
+      if (r.status === status) return;
       r.status = status;
       r.updated = todayString();
+      this.pushNotification(
+        r.email,
+        `Concern report: ${status}`,
+        `Your report "${r.category}" (${r.id}) is now ${status}.`,
+        "report",
+        r.id,
+      );
       this.persist();
       this.notify("Concern report status updated");
+    },
+    /* archive / restore */
+    toggleArchive(item, label) {
+      item.archived = !item.archived;
+      item.archivedOn = item.archived ? todayString() : "";
+      this.persist();
+      this.notify(
+        item.archived ? `${label} archived` : `${label} restored from archive`,
+      );
     },
     /* walang pasok announcement */
     publishAnnouncement() {
@@ -558,7 +639,7 @@ createApp({
       this.persist();
       this.notify("Barangay settings saved");
     },
-    resetDemo() {
+    resetData() {
       if (
         !confirm("Reset all data? This cannot be undone.")
       )
@@ -572,11 +653,53 @@ createApp({
       this.adminPage = "overview";
       this.notify("data reset");
     },
+    pushNotification(email, title, body, kind, ref) {
+      if (!email) return;
+      this.notifications.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        created: Date.now(),
+        email,
+        title,
+        body,
+        kind,
+        ref,
+        read: false,
+      });
+    },
+    toggleNotifications() {
+      this.notifOpen = !this.notifOpen;
+    },
+    markAllRead() {
+      this.residentNotifications.forEach((n) => (n.read = true));
+      this.persist();
+    },
+    openNotification(n) {
+      n.read = true;
+      this.persist();
+      this.notifOpen = false;
+      if (n.ref) {
+        this.trackId = n.ref;
+        this.page = "track";
+        this.trackSearch();
+      } else if (n.kind === "account") this.page = "account";
+      window.scrollTo({ top: 0 });
+    },
     dismissNotifications() {
       this.notifications = this.notifications.filter(
         (n) => !this.sameEmail(n.email, this.resident.email),
       );
       this.persist();
+      this.notifOpen = false;
+    },
+    timeAgo(ts) {
+      if (!ts || typeof ts !== "number") return "";
+      const m = Math.floor((Date.now() - ts) / 60000);
+      if (m < 1) return "Just now";
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h == 1) return `${h}h ago`;
+      if (h < 24) return `${h}hs ago`;
+      return this.formatDate(new Date(ts).toISOString().slice(0, 10));
     },
     notify(msg) {
       this.toast = msg;
@@ -599,6 +722,13 @@ createApp({
     },
   },
   mounted() {
+    document.addEventListener("click", (e) => {
+      if (this.notifOpen && !e.target.closest(".notif-wrap"))
+        this.notifOpen = false;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.notifOpen = false;
+    });
     this.reportForm.name = this.resident.name || "";
     this.documentForm.contact = this.resident.contact || "";
     this.persist();
