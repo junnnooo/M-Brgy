@@ -22,7 +22,7 @@
       </span>
     </a>
 
-    <nav v-if="role==='resident'" class="desktop-nav">
+    <nav v-if="role==='resident' && !resident.deactivated" class="desktop-nav">
       <button :class="{active:page==='home'}" @click="page='home'">Home</button>
       <button :class="{active:page==='announcements'}" @click="page='announcements'">Announcements</button>
       <button :class="{active:page==='services'}" @click="page='services'">Services</button>
@@ -30,7 +30,7 @@
     </nav>
 
     <div v-if="role" class="header-actions">
-      <div v-if="role==='resident'" class="notif-wrap">
+      <div v-if="role==='resident' && !resident.deactivated" class="notif-wrap">
         <button class="bell" @click="toggleNotifications" :aria-expanded="notifOpen" aria-label="Notifications" title="Notifications">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -65,14 +65,14 @@
 
       </div>
       
-      <button v-if="role==='resident'" class="avatar" @click="page='account'" title="My account">{{ residentInitial }}</button>
-      <span v-else class="header-role">Admin account</span>
+      <button v-if="role==='resident' && !resident.deactivated" class="avatar" @click="page='account'" title="My account">{{ residentInitial }}</button>
+      <span v-else class="header-role">Staff Portal</span>
       <button class="btn btn-ghost" @click="logout">Log out</button>
 
     </div>
   </header>
 
-  <div v-if="role==='resident' && activeAlert && !emergencyDismissed" class="emergency-banner" role="alert">
+  <div v-if="role==='resident' && !resident.deactivated && activeAlert && !emergencyDismissed" class="emergency-banner" role="alert">
     <span class="pulse"></span>
     <div class="emergency-copy">
       <b>{{activeAlert.title}}</b>
@@ -208,6 +208,50 @@
 
     </section>
 
+  </main>
+
+  <main v-else-if="role==='resident' && resident.deactivated" class="page-container narrow-container deactivated-page">
+    <div class="deactivated-card">
+      <span class="deactivated-icon">!</span>
+      <h1>Your account has been deactivated</h1>
+      <p class="muted">Services are unavailable while your account is deactivated.</p>
+
+      <div class="reason-box">
+        <small>REASON FOR DEACTIVATION</small>
+        <p>{{resident.deactivation_reason}}</p>
+        <small v-if="resident.deactivated_at">Deactivated on {{resident.deactivated_at}}</small>
+      </div>
+
+      <div v-if="resident.warnings.length" class="reason-box">
+        <small>WARNING HISTORY ({{resident.warnings.length}} of {{maxWarnings}})</small>
+        <ul class="warning-list">
+          <li v-for="(w,i) in resident.warnings" :key="w.id"><b>Warning {{i+1}}</b> · {{w.date}} — {{w.reason}}</li>
+        </ul>
+      </div>
+
+      <div v-if="resident.appeal && resident.appeal.status==='Pending'" class="appeal-status appeal-pending">
+        <b>Appeal pending</b>
+        <p>Sent {{resident.appeal.date}}. The barangay is reviewing your appeal.</p>
+        <p class="appeal-quote">“{{resident.appeal.message}}”</p>
+      </div>
+
+      <template v-else>
+        <div v-if="resident.appeal && resident.appeal.status==='Denied'" class="appeal-status appeal-denied">
+          <b>Your last appeal was denied</b>
+          <p>{{resident.appeal.response}}</p>
+        </div>
+
+        <form class="form-card appeal-form" @submit.prevent="submitAppeal">
+          <h3>Appeal this decision</h3>
+          <label>Why should your account be restored?
+            <textarea v-model="appealText" rows="4" maxlength="500" required placeholder="Explain your side. Barangay staff will review it."></textarea>
+          </label>
+          <small class="muted">{{appealText.length}}/500</small>
+          <button class="btn btn-primary btn-wide" type="submit">Submit appeal</button>
+        </form>
+      </template>
+
+    </div>
   </main>
 
   <main v-else-if="role==='resident'">
@@ -525,15 +569,21 @@
 
         </div>
 
-        <label>Document type
-          <select v-model="documentForm.service_type_id" required>
-            <option value="" disabled>Select a document</option>
-            <option v-for="sv in services" :key="sv.service_type_id" :value="sv.service_type_id">{{sv.service_name}}</option>
-          </select>
-        </label>
+        <fieldset class="doc-picker">
+          <legend>
+            Document type
+            <span class="muted">({{docLimit ? 'select 1 to '+docLimit : 'choose your barangay first'}})</span>
+          </legend>
 
-        <p v-if="documentForm.brgy_id && !services.length" class="muted">No documents are available for this barangay yet.</p>
-      
+          <label v-for="sv in services" :key="sv.service_type_id" :class="['check-option',{disabled:docPickDisabled(sv.service_type_id)}]">
+            <input type="checkbox" v-model="documentForm.service_type_ids" :value="sv.service_type_id" :disabled="docPickDisabled(sv.service_type_id)" />
+            <span>{{sv.service_name}}</span>
+          </label>
+
+          <p v-if="documentForm.brgy_id && !services.length" class="muted">No documents are available for this barangay yet.</p>
+          <small class="muted">{{documentForm.service_type_ids.length}} of {{docLimit}} selected · Barangay 1–8 allows 2 documents per request. Barangay 9–14 allows 3 documents per request. Each document gets its own reference number.</small>
+        </fieldset>
+
         <label>Purpose
           <textarea v-model="documentForm.purpose" required placeholder="Briefly explain why you need this document" rows="3"></textarea>
         </label>
@@ -553,8 +603,17 @@
         
         </div>
         
-        <div class="form-note">Your request will be sent to the barangay for review.</div>
-        <button class="btn btn-primary btn-wide" type="submit">Submit document request →</button>
+        <div class="form-note" :class="{'limit-note':docLimitReached}">
+          <template v-if="docLimitReached">
+            Limit reached: you have {{activeDocCount}} of {{maxActiveRequests}} active document requests.
+            You can request again once one is completed or rejected.
+          </template>
+          <template v-else>
+            Your request will be sent to the barangay for review.
+            Active requests: {{activeDocCount}} of {{maxActiveRequests}}.
+          </template>
+        </div>
+        <button class="btn btn-primary btn-wide" type="submit" :disabled="docLimitReached">Submit document request →</button>
 
       </form>
       
@@ -636,7 +695,16 @@
           <textarea v-model="reportForm.description" required rows="4" placeholder="Describe what happened and what needs attention"></textarea>
         </label>
         
-        <button class="btn btn-primary btn-wide" type="submit">Submit concern report →</button>
+        <div class="form-note" :class="{'limit-note':reportLimitReached}">
+          <template v-if="reportLimitReached">
+            Limit reached: you have {{activeReportCount}} of {{maxActiveRequests}} active concern reports.
+            You can report again once one is resolved or rejected.
+          </template>
+          <template v-else>
+            Active reports: {{activeReportCount}} of {{maxActiveRequests}}.
+          </template>
+        </div>
+        <button class="btn btn-primary btn-wide" type="submit" :disabled="reportLimitReached">Submit concern report →</button>
       
       </form>
       
@@ -1026,34 +1094,38 @@
 
 <!-- Admin Page -->
 
-  <main v-else-if="role==='admin'" class="admin-layout">
+  <main v-else-if="role==='admin'" class="admin-layout" :class="{collapsed:sidebarCollapsed}">
 
     <aside class="admin-sidebar">
 
-      <button :class="{active:adminPage==='overview'}" @click="adminPage='overview'">▦ 
+      <button type="button" class="sidebar-toggle" @click="toggleSidebar" :aria-expanded="!sidebarCollapsed" :title="sidebarCollapsed?'Expand menu':'Collapse menu'">{{sidebarCollapsed?'»':'☰'}}
+        <span>Close Side Panel</span>
+      </button>
+
+      <button :class="{active:adminPage==='overview'}" title="Overview" @click="adminPage='overview'">▦ 
         <span>Overview</span>
       </button>
       
-      <button :class="{active:adminPage==='verifications'}" @click="adminPage='verifications'">✓ 
+      <button :class="{active:adminPage==='verifications'}" title="Resident verification" @click="adminPage='verifications'">✓ 
         <span>Resident verification</span>
-        <i>{{pendingResidents.length}}</i>
+        <i>{{pendingResidents.length + pendingAppeals.length}}</i>
       </button>
       
-      <button :class="{active:adminPage==='documents'}" @click="adminPage='documents'">▤ 
+      <button :class="{active:adminPage==='documents'}" title="Document requests" @click="adminPage='documents'">▤ 
         <span>Document requests</span>
         <i>{{pendingRequests.length}}</i>
       </button>
       
-      <button :class="{active:adminPage==='reports'}" @click="adminPage='reports'">◎ 
+      <button :class="{active:adminPage==='reports'}" title="Concern reports" @click="adminPage='reports'">◎ 
         <span>Concern reports</span>
         <i>{{openReports.length}}</i>
       </button>
       
-      <button :class="{active:adminPage==='posts'}" @click="adminPage='posts'">▧ 
+      <button :class="{active:adminPage==='posts'}" title="Announcements" @click="adminPage='posts'">▧ 
         <span>Announcements</span>
       </button>
       
-      <button :class="{active:adminPage==='settings'}" @click="adminPage='settings'">⚙ 
+      <button :class="{active:adminPage==='settings'}" title="Barangay settings" @click="adminPage='settings'">⚙ 
         <span>Barangay settings</span>
       </button>
       
@@ -1061,8 +1133,8 @@
         <div class="official-avatar">BA</div>
         
         <div>
-          <b>Barangay Admin</b>
-          <small>Malakas Account</small>
+          <b>Barangay Account</b>
+          <small>Staff Account</small>
 
         </div>
 
@@ -1088,30 +1160,32 @@
 
           <div class="admin-stat">
             <small>Resident profiles</small>
-            <b>{{profiles.length}}</b>
-            <em>{{pendingResidents.length}} pending verification</em>
+            <button type="button" class="stat-num" @click="goAdmin('profiles')" title="View all resident profiles">{{activeProfiles.length}}</button>
+            <em><button type="button" class="stat-sub" @click="goAdmin('pendingVerif')" title="View residents pending verification"><strong>{{pendingResidents.length}}</strong></button> Pending verification ·
+              <button type="button" class="stat-sub" @click="goAdmin('deactivated')" title="View deactivated accounts"><strong>{{deactivatedProfiles.length}}</strong></button> deactivated<template v-if="pendingAppeals.length"> ({{pendingAppeals.length}} appeal)</template></em>
           </div>
 
           <div class="admin-stat">
             <small>Document requests</small>
-            <b>{{requests.length}}</b>
-            <em>{{pendingRequests.length}} awaiting review</em>
+            <button type="button" class="stat-num" @click="goAdmin('requests')" title="View all document requests">{{requests.length}}</button>
+            <em><button type="button" class="stat-sub" @click="goAdmin('awaiting')" title="View requests awaiting review"><strong>{{pendingRequests.length}}</strong></button> Awaiting review</em>
           </div>
 
           <div class="admin-stat">
             <small>Concern reports</small>
-            <b>{{reports.length}}</b>
-            <em>{{openReports.length}} still open</em>
+            <button type="button" class="stat-num" @click="goAdmin('reports')" title="View all concern reports">{{reports.length}}</button>
+            <em><button type="button" class="stat-sub" @click="goAdmin('open')" title="View reports that are still open"><strong>{{openReports.length}}</strong></button> Still open</em>
           </div>
-          
+
           <div class="admin-stat">
             <small>Public posts</small>
-            <b>{{announcements.length}}</b>
-            <em>{{announcements.filter(a=>a.type==='Emergency').length}} emergency alert(s) · {{archivedAnnouncements.length}} archived</em>
+            <button type="button" class="stat-num" @click="goAdmin('posts')" title="View all public posts">{{announcements.length}}</button>
+            <em><button type="button" class="stat-sub" @click="goAdmin('emergency')" title="View emergency alerts"><strong>{{emergencyCount}}</strong></button> Emergency alerts ·
+              <button type="button" class="stat-sub" @click="goAdmin('archived')" title="View archived posts"><strong>{{archivedAnnouncements.length}}</strong></button> Archived</em>
           </div>
-        
+
         </div>
-        
+
         <div class="admin-columns">
           <div class="panel">
 
@@ -1158,45 +1232,63 @@
         
         </div>
         
-        <div class="panel">
-          <div class="panel-heading">
-            <h3>Quick actions</h3>
+        <div class="admin-columns">
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h3>Recent resident verification requests</h3>
+              <button class="text-link" @click="goAdmin('profiles')">View all →</button>
+            </div>
+
+            <div v-for="p in recentProfiles" :key="p.id" class="record-row">
+              <div>
+                <b>{{p.name||'Unnamed resident'}}</b>
+                <small>{{p.email}}</small>
+                <small>{{p.address||'No address provided'}}</small>
+              </div>
+
+              <div class="row-end">
+                <span class="status-pill" :class="p.verified?'status-done':'status-pending'">{{p.verified?'Verified':'Pending'}}</span>
+                <button v-if="!p.verified" class="small-action" @click="toggleVerified(p)">Mark verified</button>
+              </div>
+            </div>
+
+            <div v-if="!recentProfiles.length" class="empty-state">No resident profiles yet.</div>
           </div>
-          
-          <div class="quick-actions">
-            <button @click="adminPage='verifications'">✓ Review resident verification 
-              <span>→</span>
-            </button>
-            
-            <button @click="adminPage='documents'">▤ Process document requests 
-              <span>→</span>
-            </button>
-            
-            <button @click="adminPage='reports'">◎ Update concern report status 
-              <span>→</span>
-            </button>
-            
-            <button @click="adminPage='posts';showPostForm=true">＋ Publish community announcement 
-              <span>→</span>
-            </button>
-          
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h3>Recent announcements</h3>
+              <button class="text-link" @click="goAdmin('posts')">View all →</button>
+            </div>
+
+            <div v-for="a in recentAdminAnnouncements" :key="a.kind+a.id" class="record-row">
+              <div>
+                <span class="tag" :class="a.type==='Emergency'?'tag-red':'tag-teal'">{{a.type}}</span>
+                <b>{{a.title}}</b>
+                <small>{{day(a.date)}} {{month(a.date)}}</small>
+              </div>
+            </div>
+
+            <div v-if="!recentAdminAnnouncements.length" class="empty-state">No announcements published.</div>
           </div>
-        
+
         </div>
-      
+
       </section>
 
       <section v-else-if="adminPage==='verifications'" class="panel admin-table-panel">
         <div class="panel-heading">
           <h3>Resident verification</h3>
-          <span class="muted">{{verifiedResidents.length}} verified · {{pendingResidents.length}} pending</span>
+          <span class="muted">{{verifiedResidents.length}} verified · {{pendingResidents.length}} pending · {{deactivatedProfiles.length}} deactivated</span>
         </div>
         <div class="admin-toolbar">
           <div class="view-tabs" role="tablist" aria-label="Filter residents by status">
 
-            <button type="button" :class="['filter-chip',{selected:verifFilter==='all'}]" @click="verifFilter='all'">All ({{profiles.length}})</button>
+            <button type="button" :class="['filter-chip',{selected:verifFilter==='all'}]" @click="verifFilter='all'">All ({{activeProfiles.length}})</button>
             <button type="button" :class="['filter-chip',{selected:verifFilter==='verified'}]" @click="verifFilter='verified'">Verified ({{verifiedResidents.length}})</button>
             <button type="button" :class="['filter-chip',{selected:verifFilter==='pending'}]" @click="verifFilter='pending'">Pending ({{pendingResidents.length}})</button>
+            <button type="button" :class="['filter-chip',{selected:verifFilter==='deactivated'}]" @click="verifFilter='deactivated'">Deactivated ({{deactivatedProfiles.length}}<template v-if="pendingAppeals.length"> · {{pendingAppeals.length}} appeal<template v-if="pendingAppeals.length>1">s</template></template>)</button>
           
           </div>
           
@@ -1205,7 +1297,7 @@
         </div>
 
         <div class="table-wrap">
-          <table>
+          <table v-if="verifFilter!=='deactivated'">
             <thead>
               <tr>
 
@@ -1213,44 +1305,105 @@
                 <th>Email</th>
                 <th>Address</th>
                 <th>Status</th>
+                <th>Warnings</th>
                 <th>Action</th>
 
               </tr>
             </thead>
-            
+
             <tbody>
               <tr v-for="p in filteredProfiles" :key="p.id">
 
                 <td>
                   <b>{{p.name||'Unnamed resident'}}</b>
                 </td>
-                
+
                 <td>{{p.email}}</td>
                 <td>{{p.address||'—'}}</td>
 
                 <td>
                   <span class="status-pill" :class="p.verified?'status-done':'status-pending'">{{p.verified?'Verified':'Pending'}}</span>
                 </td>
-                
+
                 <td>
-                  <button class="small-action" @click="toggleVerified(p)">{{p.verified?'Revoke':'Mark verified'}}</button>
+                  <span class="status-pill" :class="p.warnings.length ? 'status-rejected' : 'status-done'">{{p.warnings.length}}/{{maxWarnings}}</span>
                 </td>
-              
+
+                <td>
+                  <div class="row-actions">
+                    <button class="small-action" @click="toggleVerified(p)">{{p.verified?'Revoke':'Mark verified'}}</button>
+                    <button class="small-action" @click="openAccountDialog('warn',p)">Warning</button>
+                    <button class="small-action danger" @click="openAccountDialog('deactivate',p)">Deactivate</button>
+                  </div>
+                </td>
+
               </tr>
-              
+
               <tr v-if="!filteredProfiles.length">
-                <td colspan="5" class="empty-cell">
-                  {{verifSearch.trim() 
-                    ? 'No resident matches that search.' : (verifFilter==='verified' 
-                    ? 'No verified residents yet.' : verifFilter==='pending' 
+                <td colspan="6" class="empty-cell">
+                  {{verifSearch.trim()
+                    ? 'No resident matches that search.' : (verifFilter==='verified'
+                    ? 'No verified residents yet.' : verifFilter==='pending'
                     ? 'No residents are pending verification.' : 'No resident accounts yet.')}}
                 </td>
               </tr>
-            
+
             </tbody>
-          
+
           </table>
-        
+
+          <table v-else>
+            <thead>
+              <tr>
+
+                <th>Resident</th>
+                <th>Email</th>
+                <th>Reason</th>
+                <th>Deactivated</th>
+                <th>Appeal</th>
+                <th>Action</th>
+
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-for="p in filteredProfiles" :key="p.id">
+
+                <td>
+                  <b>{{p.name||'Unnamed resident'}}</b>
+                </td>
+
+                <td>{{p.email}}</td>
+                <td class="reason-cell">{{p.deactivation_reason}}</td>
+                <td>{{p.deactivated_at||'—'}}</td>
+
+                <td>
+                  <template v-if="p.appeal">
+                    <span class="status-pill" :class="p.appeal.status==='Pending'?'status-pending':'status-rejected'">{{p.appeal.status}}</span>
+                    <small class="appeal-note">“{{p.appeal.message}}”</small>
+                  </template>
+                  <span v-else class="muted">No appeal</span>
+                </td>
+
+                <td>
+                  <div class="row-actions">
+                    <button class="small-action" @click="reactivateAccount(p)">Reactivate</button>
+                    <button v-if="p.appeal && p.appeal.status==='Pending'" class="small-action danger" @click="openAccountDialog('denyAppeal',p)">Deny appeal</button>
+                  </div>
+                </td>
+
+              </tr>
+
+              <tr v-if="!filteredProfiles.length">
+                <td colspan="6" class="empty-cell">
+                  {{verifSearch.trim() ? 'No deactivated account matches that search.' : 'No deactivated accounts.'}}
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
         </div>
 
         <p class="table-note">Note: real on-site ID checking must be performed by authorized barangay staff before marking a resident verified.</p>
@@ -1381,6 +1534,7 @@
 
           <select v-model="reportFilter" class="compact-select" aria-label="Filter concern reports by status">
             <option>All</option>
+            <option>Open</option>
             <option>Submitted</option>
             <option>Received</option>
             <option>In Progress</option>
@@ -1540,6 +1694,10 @@
               <button type="button" :class="['filter-chip',{selected:annView==='active'}]" @click="annView='active'">Active ({{announcements.length}})</button>
               <button type="button" :class="['filter-chip',{selected:annView==='archived'}]" @click="annView='archived'">Archived ({{archivedAnnouncements.length}})</button>
             </div>
+            <div class="view-tabs">
+              <button type="button" :class="['filter-chip',{selected:annTypeFilter==='All'}]" @click="annTypeFilter='All'">All types</button>
+              <button type="button" :class="['filter-chip',{selected:annTypeFilter==='Emergency'}]" @click="annTypeFilter='Emergency'">Emergency</button>
+            </div>
           
           </div>
           
@@ -1634,6 +1792,43 @@
     <span class="footer-copy">© 2026 kaBRGY · Frontend prototype</span>
   
   </footer>
+
+  <div v-if="accountDialog" class="modal-backdrop" @click.self="closeAccountDialog" role="presentation">
+    <form class="success-modal reject-modal" @submit.prevent="confirmAccountDialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
+      <button type="button" class="modal-close" @click="closeAccountDialog" aria-label="Cancel">×</button>
+      <h2 id="account-dialog-title">{{accountDialog.mode==='warn' ? 'Send warning' : accountDialog.mode==='deactivate' ? 'Deactivate account' : 'Deny appeal'}}</h2>
+      <p>{{accountDialog.profile.name||'Unnamed resident'}} · {{accountDialog.profile.email}}</p>
+      <p v-if="accountDialog.mode==='warn'" class="muted">
+        This will be warning {{accountDialog.profile.warnings.length+1}} of {{maxWarnings}}.
+        <b v-if="accountDialog.profile.warnings.length+1>=maxWarnings">The account will be deactivated automatically.</b>
+      </p>
+
+      <label>{{accountDialog.mode==='warn' ? 'Reason for warning' : accountDialog.mode==='deactivate' ? 'Reason for deactivation' : 'Reason for denying the appeal'}}
+        <textarea v-model="accountDialog.reason" rows="4" maxlength="300" placeholder="Explain clearly. The resident will see this."></textarea>
+      </label>
+
+      <small class="muted reject-hint">{{accountDialog.reason.length}}/300 · The resident will see this reason.</small>
+      <div v-if="accountError" class="auth-error" role="alert">{{accountError}}</div>
+
+      <div class="reject-actions">
+        <button type="button" class="btn btn-ghost" @click="closeAccountDialog">Cancel</button>
+        <button type="submit" class="btn btn-reject">{{accountDialog.mode==='warn' ? 'Send warning' : accountDialog.mode==='deactivate' ? 'Deactivate account' : 'Deny appeal'}}</button>
+      </div>
+
+    </form>
+  </div>
+
+  <div v-if="warningAck && role==='resident' && !resident.deactivated" class="modal-backdrop" role="presentation">
+    <div class="success-modal warning-modal" role="alertdialog" aria-modal="true">
+      <div class="success-mark warning-mark">!</div>
+      <h2>Account warning {{resident.warnings.length}} of {{maxWarnings}}</h2>
+      <ul class="warning-list">
+        <li v-for="w in resident.warnings.filter(x=>!x.seen)" :key="w.id"><b>{{w.date}}</b> — {{w.reason}}</li>
+      </ul>
+      <p>{{maxWarnings - resident.warnings.length}} more warning(s) will deactivate your account. Please follow the barangay rules.</p>
+      <button class="btn btn-primary btn-wide" @click="acknowledgeWarnings">I understand</button>
+    </div>
+  </div>
 
   <div v-if="rejectDialog" class="modal-backdrop" @click.self="closeReject" role="presentation">
     <form class="success-modal reject-modal" @submit.prevent="confirmReject" role="dialog" aria-modal="true" aria-labelledby="reject-title">

@@ -1,5 +1,5 @@
 const { createApp } = Vue;
-const STORAGE_KEY = "kabrgy_dkoalam";
+const STORAGE_KEY = "kabrgy_dkoalamata";
 const todayString = () => new Date().toISOString().slice(0, 10);
 const defaultData = () => ({
   session: null,
@@ -31,7 +31,7 @@ const defaultData = () => ({
     },
   ],
   settings: {
-    name: "Your Barangay",
+    name: "Barangay #",
     address: "Barangay Hall",
     hours: "Monday–Friday, 8:00 AM–5:00 PM",
   },
@@ -62,6 +62,10 @@ createApp({
       adminForm: { username: "", password: "" },
       page: "home",
       adminPage: "overview",
+      sidebarCollapsed: (() => {
+        try { return localStorage.getItem("kabrgy-sidebar") === "1"; } catch (e) { return false; }
+      })(),
+      annTypeFilter: "All",
       announcementFilter: "All",
       requestFilter: "All",
       reportFilter: "All",
@@ -82,7 +86,7 @@ createApp({
         name: "",
         contact: "",
         province: "",
-        municipality: "C",
+        municipality: "",
         barangay: "",
       },
       verifSearch: "",
@@ -109,6 +113,10 @@ createApp({
       reportExpanded: false,
       trackLimit: 3,
       rejectDialog: null,
+      accountDialog: null,
+      accountError: "",
+      appealText: "",
+      warningAck: false,
       rejectError: "",
       modal: "",
       modalTitle: "",
@@ -148,9 +156,40 @@ createApp({
       return this.announcements.filter((a) => a.archived);
     },
     adminAnnouncements() {
-      return this.annView === "archived"
-        ? this.archivedAnnouncements
-        : this.publicAnnouncements;
+      const list =
+        this.annView === "archived"
+          ? this.archivedAnnouncements
+          : this.publicAnnouncements;
+      return list.filter(
+        (a) => this.annTypeFilter === "All" || a.type === this.annTypeFilter,
+      );
+    },
+    recentAdminAnnouncements() {
+      return this.publicAnnouncements
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 5);
+    },
+    recentProfiles() {
+      return this.activeProfiles.slice(0, 5);
+    },
+    /* account moderation */
+    maxWarnings() {
+      return 3;
+    },
+    activeProfiles() {
+      return this.profiles.filter((p) => !p.deactivated);
+    },
+    deactivatedProfiles() {
+      return this.profiles.filter((p) => p.deactivated);
+    },
+    pendingAppeals() {
+      return this.deactivatedProfiles.filter(
+        (p) => p.appeal && p.appeal.status === "Pending",
+      );
+    },
+    emergencyCount() {
+      return this.publicAnnouncements.filter((a) => a.type === "Emergency").length;
     },
     latestAnnouncements() {
       return this.publicAnnouncements
@@ -185,6 +224,24 @@ createApp({
         this.sameEmail(r.email, this.resident.email),
       );
     },
+    /* per-resident limit: only in-progress items count; Completed / Resolved / Rejected free a slot */
+    maxActiveRequests() {
+      return 3;
+    },
+    activeDocCount() {
+      const live = ["Pending", "Approved", "Ready for Pickup"];
+      return this.residentRequests.filter((r) => live.includes(r.status)).length;
+    },
+    activeReportCount() {
+      const live = ["Submitted", "Received", "In Progress"];
+      return this.residentReports.filter((r) => live.includes(r.status)).length;
+    },
+    docLimitReached() {
+      return this.activeDocCount >= this.maxActiveRequests;
+    },
+    reportLimitReached() {
+      return this.activeReportCount >= this.maxActiveRequests;
+    },
     residentNotifications() {
       return this.notifications
         .filter((n) => this.sameEmail(n.email, this.resident.email))
@@ -205,10 +262,10 @@ createApp({
         .sort((a, b) => b.date.localeCompare(a.date));
     },
     pendingResidents() {
-      return this.profiles.filter((p) => !p.verified);
+      return this.activeProfiles.filter((p) => !p.verified);
     },
     verifiedResidents() {
-      return this.profiles.filter((p) => p.verified);
+      return this.activeProfiles.filter((p) => p.verified);
     },
     activeRequests() {
       return this.requests.filter((r) => !r.archived);
@@ -229,11 +286,16 @@ createApp({
       return this.activeReports.filter((r) => r.status !== "Resolved");
     },
     filteredProfiles() {
-      return this.profiles.filter(
-        (p) =>
-          (this.verifFilter === "all" ||
-            (this.verifFilter === "verified" ? p.verified : !p.verified)) &&
-          this.matches(this.verifSearch, [p.email, p.name, p.address]),
+      const base =
+        this.verifFilter === "deactivated"
+          ? this.deactivatedProfiles
+          : this.verifFilter === "verified"
+            ? this.verifiedResidents
+            : this.verifFilter === "pending"
+              ? this.pendingResidents
+              : this.activeProfiles;
+      return base.filter((p) =>
+        this.matches(this.verifSearch, [p.email, p.name, p.address]),
       );
     },
     filteredRequests() {
@@ -250,7 +312,10 @@ createApp({
         this.reportView === "archived" ? this.archivedReports : this.activeReports;
       return list.filter(
         (r) =>
-          (this.reportFilter === "All" || r.status === this.reportFilter) &&
+          (this.reportFilter === "All" ||
+            (this.reportFilter === "Open"
+              ? r.status !== "Resolved"
+              : r.status === this.reportFilter)) &&
           this.matches(this.reportSearch, [r.email, r.name, r.id]),
       );
     },
@@ -361,6 +426,31 @@ createApp({
     adminPage() { this.docSelected = []; this.reportSelected = []; },
   },
   methods: {
+    /* Admin dashboard: jump to a page with the matching filter preset */
+    goAdmin(target) {
+      const t = {
+        profiles: ["verifications", () => { this.verifFilter = "all"; }],
+        pendingVerif: ["verifications", () => { this.verifFilter = "pending"; }],
+        deactivated: ["verifications", () => { this.verifFilter = "deactivated"; }],
+        requests: ["documents", () => { this.docView = "active"; this.requestFilter = "All"; }],
+        awaiting: ["documents", () => { this.docView = "active"; this.requestFilter = "Pending"; }],
+        reports: ["reports", () => { this.reportView = "active"; this.reportFilter = "All"; }],
+        open: ["reports", () => { this.reportView = "active"; this.reportFilter = "Open"; }],
+        posts: ["posts", () => { this.annView = "active"; this.annTypeFilter = "All"; }],
+        emergency: ["posts", () => { this.annView = "active"; this.annTypeFilter = "Emergency"; }],
+        archived: ["posts", () => { this.annView = "archived"; this.annTypeFilter = "All"; }],
+      }[target];
+      if (!t) return;
+      this.verifSearch = "";
+      this.docSearch = "";
+      this.reportSearch = "";
+      t[1]();
+      this.adminPage = t[0];
+    },
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed;
+      try { localStorage.setItem("kabrgy-sidebar", this.sidebarCollapsed ? "1" : "0"); } catch (e) {}
+    },
     /* Barangay 1-8 : 2 documents per request tas yung brgy 9-14 : 3 documents per request */
     docLimitFor(b) {
       if (!b) return 0;
@@ -449,7 +539,18 @@ createApp({
       return fields.some((f) => (f || "").toLowerCase().includes(q));
     },
     blankResident() {
-      return { name: "", email: "", address: "", contact: "", verified: false };
+      return {
+        name: "",
+        email: "",
+        address: "",
+        contact: "",
+        verified: false,
+        deactivated: false,
+        deactivationReason: "",
+        deactivatedAt: "",
+        warnings: [],
+        appeal: null,
+      };
     },
     publicProfile(p) {
       return {
@@ -458,6 +559,11 @@ createApp({
         address: p.address || "",
         contact: p.contact || "",
         verified: !!p.verified,
+        deactivated: !!p.deactivated,
+        deactivationReason: p.deactivationReason || "",
+        deactivatedAt: p.deactivatedAt || "",
+        warnings: (p.warnings || []).map((w) => ({ ...w })),
+        appeal: p.appeal ? { ...p.appeal } : null,
       };
     },
     setAuthView(v) {
@@ -477,11 +583,159 @@ createApp({
       this.loginForm = { email: "", password: "" };
       this.signupForm = { name: "", email: "", password: "", confirm: "" };
       this.authError = "";
+      this.appealText = "";
+      this.warningAck =
+        !this.resident.deactivated &&
+        this.resident.warnings.some((w) => !w.seen);
       this.persist();
       window.scrollTo({ top: 0 });
       this.notify(
         "Welcome, " + (this.resident.name || "resident").split(" ")[0],
       );
+    },
+    /* replace a profile (keeps the logged-in resident view in sync) */
+    updateProfile(email, patch) {
+      const i = this.profiles.findIndex((x) => this.sameEmail(x.email, email));
+      if (i < 0) return null;
+      const next = { ...this.profiles[i], ...patch };
+      this.profiles.splice(i, 1, next);
+      if (this.sameEmail(email, this.resident.email))
+        this.resident = this.publicProfile(next);
+      return next;
+    },
+    openAccountDialog(mode, p) {
+      this.accountDialog = { mode, profile: p, reason: "" };
+      this.accountError = "";
+    },
+    closeAccountDialog() {
+      this.accountDialog = null;
+      this.accountError = "";
+    },
+    confirmAccountDialog() {
+      const d = this.accountDialog;
+      if (!d) return;
+      const reason = d.reason.trim();
+      if (reason.length < 5) {
+        this.accountError = "Please write a reason (at least 5 characters).";
+        return;
+      }
+      const p = d.profile;
+      if (d.mode === "warn") this.issueWarning(p, reason);
+      else if (d.mode === "deactivate") this.deactivateAccount(p, reason);
+      else if (d.mode === "denyAppeal") this.denyAppeal(p, reason);
+      this.closeAccountDialog();
+    },
+    issueWarning(p, reason) {
+      const warnings = [
+        ...(p.warnings || []),
+        {
+          id: `W-${Date.now()}`,
+          reason,
+          date: todayString(),
+          seen: false,
+        },
+      ];
+      const n = warnings.length;
+      this.updateProfile(p.email, { warnings });
+      if (n >= this.maxWarnings) {
+        this.deactivateAccount(
+          { ...p, warnings },
+          `Reached ${this.maxWarnings} of ${this.maxWarnings} warnings. Latest warning: ${reason}`,
+          true,
+        );
+        return;
+      }
+      this.pushNotification(
+        p.email,
+        `Account warning ${n} of ${this.maxWarnings}`,
+        `${reason} — ${this.maxWarnings - n} more warning(s) will deactivate your account.`,
+        "account",
+        "",
+      );
+      this.persist();
+      this.notify(`Warning ${n} of ${this.maxWarnings} sent`);
+    },
+    deactivateAccount(p, reason, auto) {
+      this.updateProfile(p.email, {
+        deactivated: true,
+        deactivationReason: reason,
+        deactivatedAt: todayString(),
+        appeal: null,
+      });
+      this.pushNotification(
+        p.email,
+        "Account deactivated",
+        reason,
+        "account",
+        "",
+      );
+      this.persist();
+      this.notify(
+        auto
+          ? "3rd warning reached — account deactivated"
+          : "Account deactivated",
+      );
+    },
+    reactivateAccount(p) {
+      this.updateProfile(p.email, {
+        deactivated: false,
+        deactivationReason: "",
+        deactivatedAt: "",
+        warnings: [],
+        appeal: null,
+      });
+      this.pushNotification(
+        p.email,
+        "Account reactivated",
+        "Your resident account has been restored and your warnings were cleared. Please follow the barangay rules.",
+        "account",
+        "",
+      );
+      this.persist();
+      this.notify("Account reactivated");
+    },
+    denyAppeal(p, reason) {
+      this.updateProfile(p.email, {
+        appeal: {
+          ...(p.appeal || {}),
+          status: "Denied",
+          response: reason,
+          respondedAt: todayString(),
+        },
+      });
+      this.pushNotification(
+        p.email,
+        "Appeal denied",
+        reason,
+        "account",
+        "",
+      );
+      this.persist();
+      this.notify("Appeal denied");
+    },
+    /* resident side */
+    submitAppeal() {
+      const message = this.appealText.trim();
+      if (message.length < 10) {
+        this.notify("Please explain your appeal (at least 10 characters).");
+        return;
+      }
+      this.updateProfile(this.resident.email, {
+        appeal: { message, date: todayString(), status: "Pending" },
+      });
+      this.appealText = "";
+      this.persist();
+      this.notify("Appeal sent to the barangay");
+    },
+    acknowledgeWarnings() {
+      const warnings = (
+        (this.profiles.find((x) =>
+          this.sameEmail(x.email, this.resident.email),
+        ) || {}).warnings || []
+      ).map((w) => ({ ...w, seen: true }));
+      this.updateProfile(this.resident.email, { warnings });
+      this.warningAck = false;
+      this.persist();
     },
     /* resident login */
     loginResident() {
@@ -588,9 +842,16 @@ createApp({
       this.documentForm.contact = this.resident.contact || "";
     },
     submitDocument() {
+      if (this.resident.deactivated) return;
       if (!this.resident.verified) {
         this.page = "account";
         this.notify("Please complete resident verification first.");
+        return;
+      }
+      if (this.docLimitReached) {
+        this.notify(
+          `You already have ${this.maxActiveRequests} active document requests. Wait until one is completed or rejected.`,
+        );
         return;
       }
       const limit = this.docLimitFor(this.documentForm.barangay);
@@ -640,6 +901,13 @@ createApp({
       };
     },
     submitReport() {
+      if (this.resident.deactivated) return;
+      if (this.reportLimitReached) {
+        this.notify(
+          `You already have ${this.maxActiveRequests} active concern reports. Wait until one is resolved or rejected.`,
+        );
+        return;
+      }
       const r = {
         id: this.id("REP", this.reports),
         category: this.reportForm.category,
@@ -1028,11 +1296,16 @@ createApp({
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       this.notifOpen = false;
-      if (this.rejectDialog) this.closeReject();
+      if (this.accountDialog) this.closeAccountDialog();
+      else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
     this.reportForm.name = this.resident.name || "";
     this.documentForm.contact = this.resident.contact || "";
+    this.warningAck =
+      this.role === "resident" &&
+      !this.resident.deactivated &&
+      this.resident.warnings.some((w) => !w.seen);
     this.persist();
   },
 }).mount("#app");

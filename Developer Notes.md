@@ -6,96 +6,127 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
-## Version: 1.1.2
-(+ | ~) Added and Updated Small Features for Quality of Life Changes
+## Version: 2.0.0 (MAJOR UPDATE)
 
-(~) Fixed bug on Reject Option due to the changes in the Current Database
+Residents Panel:
+
+    (+) Added a Max Attempt/Limitation for using Service 3 attempt only.
+    	> If the Status is Pending, Receive,  Approve, In progress, Ready to Pickup, it will count as 1 attempt.
+    	> If the Status is Completed, Resolve, Rejected it will count as 0 attempt.
+    (+) Added a Warning Display for attempting to break a rules.
+        	> Warning Attempt is 0 of 3
+          		- If the warning reaches 3 of 3 the account will get Deactivated. 
+    (+) Added a Warning History 
+    (+) Added a Deactivated Account Display, Resident Account temporary can't use the services 
+    (+) Added a Reason for Deactivation 
+    (+) Added a Appeal Form 
+    (+) Added a Denied Appeal Reason Display 
+    (+) Added a Notification for Account Status(Account Deactivated or Reactivated)
+
+Admin Panel:
+
+    (+) Added Recent resident verification requests redirect 
+    (+) Added Recent annoucement redirect 
+    (+) Added Collapsing Side Menu "Close Side Panel"
+    (+) Added a Warning Feature on Resident account 
+    (+) Added a Reason for Warning and Deactivation 
+    (+) Added a Deactivate Account and Reactivate Feature 
+    (+) Added a Accept Appeal and Deny Appeal Feature
+
+    (~) "Admin Acoount" > "Staff Account"
+
+    (-) Remove Quick Action Form
+
+## Version: 1.1.2
+    (+ | ~) Added and Updated Small Features for Quality of Life Changes
+
+    (~) Fixed bug on Reject Option due to the changes in the Current Database
 
 ## Version: 1.1.1 (MAJOR UPDATE)
-(+) Added a new table in the Database [ref_counters] to house the reference numbers of each different type of request and concerns
-(+) Added a new option in request called "Rejected"
-(+) Added a way to see why the document is Rejected
-(+) Added a Close option in the Emergency Announcements in Residents View
-(+) Added a Category Section in the Track Status
-(+) Added a new Select button in the admin document request and concern reports. Can multi select multiple request and concerns
-(+) Added a way to Delete announcements, as well as a safety net "confirm delete"
-(+) Added an Archive feature in Announcements
-(+) Added a category inside residents verification where it separates Pending and Verified uses, for better organization
-(+) Added a feature in Admin where when rejecting a concern, Admin needs to provide a reason, also has a default input if admin has no reason to input
-(+) Added a feature in Admin where a request or a concern is labeled as Completed, Resolved, or Rejected, the request or concern will automatically be archived.
+    (+) Added a new table in the Database [ref_counters] to house the reference numbers of each different type of request and concerns
+    (+) Added a new option in request called "Rejected"
+    (+) Added a way to see why the document is Rejected
+    (+) Added a Close option in the Emergency Announcements in Residents View
+    (+) Added a Category Section in the Track Status
+    (+) Added a new Select button in the admin document request and concern reports. Can multi select multiple request and concerns
+    (+) Added a way to Delete announcements, as well as a safety net "confirm delete"
+    (+) Added an Archive feature in Announcements
+    (+) Added a category inside residents verification where it separates Pending and Verified uses, for better organization
+    (+) Added a feature in Admin where when rejecting a concern, Admin needs to provide a reason, also has a default input if admin has no reason to input
+    (+) Added a feature in Admin where a request or a concern is labeled as Completed, Resolved, or Rejected, the request or concern will automatically be archived.
 
-(↑) Updated The Database to house the new added features as well as to handel the new Refferences
+    (↑) Updated The Database to house the new added features as well as to handel the new Refferences
 
-(~) Reformated the Formatting of client/index.htm
-(~) Fixed Positioning on the Footer in the Announcement "Schedule" Section.
-(~) New Limit to how much documents you can request in one Request form. From 1 to 3 documents
-(~) Fix a Silent Bug, Where Archived request or concerns status can still be changed
+    (~) Reformated the Formatting of client/index.htm
+    (~) Fixed Positioning on the Footer in the Announcement "Schedule" Section.
+    (~) New Limit to how much documents you can request in one Request form. From 1 to 3 documents
+    (~) Fix a Silent Bug, Where Archived request or concerns status can still be changed
 
-(*) Bug on Reject Option due to the changes in the Current Database
-        Discovered: The Error is comming from the wrong packaging and wrong hook in the routes/reports.js
+    (*) Bug on Reject Option due to the changes in the Current Database
+            Discovered: The Error is comming from the wrong packaging and wrong hook in the routes/reports.js
 
 ## Version: 1.0.4
-(↑) Updated client folder to fix the new old-prototype files
+    (↑) Updated client folder to fix the new old-prototype files
 
-(~) Fixed Bug in Residents Panel, Mobile Bug, Notification dropdown overflowing is now fixed
-(~) Fixed Bug in Residents Panel, Notifications in the incident/consern report is now coming though
+    (~) Fixed Bug in Residents Panel, Mobile Bug, Notification dropdown overflowing is now fixed
+    (~) Fixed Bug in Residents Panel, Notifications in the incident/consern report is now coming though
 
 ## Version: 1.0.3-d
-(+ | ↑) Added and Updated new "old-prototype" for preparation for the emergency update
+    (+ | ↑) Added and Updated new "old-prototype" for preparation for the emergency update
 
-(* | ~) Prividous Bug in the Residents Panel, Mobile Bug, is still not resolved
-(*) New Bug, Reseidents View, Notifications in the incident/consern report is not comming though
-        Discovered: The notification being updated is the "Verified account"
+    (* | ~) Prividous Bug in the Residents Panel, Mobile Bug, is still not resolved
+    (*) New Bug, Reseidents View, Notifications in the incident/consern report is not comming though
+            Discovered: The notification being updated is the "Verified account"
 
 Mini-Update to incorporate the new elements in preparation for the migration of new Client designs
 
 ## Version: 1.0.3-c
-(↑ | ~) Updated and Fixed Bugs that is present in client files
-(↑ | ~) Updated and Fixed Bugs that is present in routes files
+    (↑ | ~) Updated and Fixed Bugs that is present in client files
+    (↑ | ~) Updated and Fixed Bugs that is present in routes files
 
-(↑) Updated accounts.js, notification.js, reports.js, and request.js to fix current bugs related in the system
-(↑) Updated tables in the database to rehook and be wired properly
+    (↑) Updated accounts.js, notification.js, reports.js, and request.js to fix current bugs related in the system
+    (↑) Updated tables in the database to rehook and be wired properly
 
-(~ | +) Fixed and Added a new column in our database to house the Archive mechanic
+    (~ | +) Fixed and Added a new column in our database to house the Archive mechanic
 
-(~) Fixed bug in the Admin panel where archive button is not working
-(~) Fixed bug in the Admin panel where Update status has a broken end point
-(~) Fixed bug in the Admin panel where the status is not updating
-(~) Fixed bug in the Admin panel, fixed the similar problem that consern has when updating and setting a new status
-(~) Fixed bug in the Residents panel, Notifications button for setting all notifications as read as been fixed
-(~) Fixed bug in the Residents panel, Silent bug, notifications not being clicable and gets you redirected to the specific area for that notification
-(~) Fixed bug in the Residents panel, Silent bug, fixed the small issue with the notifications dropdown design
+    (~) Fixed bug in the Admin panel where archive button is not working
+    (~) Fixed bug in the Admin panel where Update status has a broken end point
+    (~) Fixed bug in the Admin panel where the status is not updating
+    (~) Fixed bug in the Admin panel, fixed the similar problem that consern has when updating and setting a new status
+    (~) Fixed bug in the Residents panel, Notifications button for setting all notifications as read as been fixed
+    (~) Fixed bug in the Residents panel, Silent bug, notifications not being clicable and gets you redirected to the specific area for that notification
+    (~) Fixed bug in the Residents panel, Silent bug, fixed the small issue with the notifications dropdown design
 
-(*) Bug in the Residents panel, Mobile Bug, Notification dropdown is overflowing from the screen
+    (*) Bug in the Residents panel, Mobile Bug, Notification dropdown is overflowing from the screen
 
 ## Version: 1.0.3-b
-(↑ | ~) Updated and Fixed Bugs that is present in client files
-(↑) Updated app.js to house the new updates properly
+    (↑ | ~) Updated and Fixed Bugs that is present in client files
+    (↑) Updated app.js to house the new updates properly
 
-(~) Fixed silent bug in client/style.css that causes archive button to not show in the Admin panel
-(~) Fixed silent bug that doesn't let notifications is_read not updating and not letting notifications be labbled as read
-(~) Fixed issue with notification bell not showing the notification dropdown
-(~) Fixed issue where notification dropdown gets stuck as opened
+    (~) Fixed silent bug in client/style.css that causes archive button to not show in the Admin panel
+    (~) Fixed silent bug that doesn't let notifications is_read not updating and not letting notifications be labbled as read
+    (~) Fixed issue with notification bell not showing the notification dropdown
+    (~) Fixed issue where notification dropdown gets stuck as opened
 
-(*) Bugged in the Admin panel, with the new update, the archive button has no endpoint in the Database
-(*) Bugged in the Admin panel, with the new update, the Update status has a broken endpoint, This doesn't have a place to update, hook endpoint is broken
-(*) Bugged in the Admin panel, with the new update, Status not updating
-(*) Bugged in the Admin panel, with the new update, the consern reports has the similar problem as the Update status
-(*) Bugged in the Residents panel, with the new update, Notification's button for mark read is broken, not setting all unread notifications as read
+    (*) Bugged in the Admin panel, with the new update, the archive button has no endpoint in the Database
+    (*) Bugged in the Admin panel, with the new update, the Update status has a broken endpoint, This doesn't have a place to update, hook endpoint is broken
+    (*) Bugged in the Admin panel, with the new update, Status not updating
+    (*) Bugged in the Admin panel, with the new update, the consern reports has the similar problem as the Update status
+    (*) Bugged in the Residents panel, with the new update, Notification's button for mark read is broken, not setting all unread notifications as read
 
 ## Version: 1.0.3-a
-(↑) Updated client Files to fit the new "old-prototype" files
+    (↑) Updated client Files to fit the new "old-prototype" files
 
-(+) Added a Search bar in Admin accounts to easily find gmail accounts of residents
-(+) Added a Archived Button and Archive section for both Requests and Conserns
+    (+) Added a Search bar in Admin accounts to easily find gmail accounts of residents
+    (+) Added a Archived Button and Archive section for both Requests and Conserns
 
-(~) A sight changes to wordings, Changed "Track a Report" to "Track Status"
+    (~) A sight changes to wordings, Changed "Track a Report" to "Track Status"
 
-(-) Removed the "Location Tracker" inside Track Status
+    (-) Removed the "Location Tracker" inside Track Status
 
-(*) System has encountered Bugs from Notifications to reports, request and finally accounts of the user
-(*) System is currently buggy in the client/app.js, Fixing this will be the priority for the next update
-(*) System is currently leaking important information (like passwords)
+    (*) System has encountered Bugs from Notifications to reports, request and finally accounts of the user
+    (*) System is currently buggy in the client/app.js, Fixing this will be the priority for the next update
+    (*) System is currently leaking important information (like passwords)
 
 ## Version: 1.0.2
 (↑) Updated Files to fit the new Stupabase Data
@@ -137,11 +168,11 @@ Files and Folders:
         .gitignore
 
 ## Version: 1.0.1
-(↑) Updated the new Primary Keys in the Supabase Database.
+    (↑) Updated the new Primary Keys in the Supabase Database.
 
-(↑) Updated the create-admin.js to accomodate the new Formating of our PK inside our Database
+    (↑) Updated the create-admin.js to accomodate the new Formating of our PK inside our Database
 
-(*) Bugs: Need to adjust all routing to the new formating in the database
+    (*) Bugs: Need to adjust all routing to the new formating in the database
 
 Files and Folders:
 
@@ -315,7 +346,7 @@ Creation of files (like .env, index.js, both package.json, ect)
 ## Symbols To Remember
 
     (+)     =       Added a new File/Folder/Component
-    (~)     =       Moved a File/Folder/Component
+    (~)     =       Moved or Fixed a File/Folder/Component
     (↑)     =       Updated a File/Component
     (*)     =       Currently Bugged in the System
     (-)     =       Removed a File/Folder/Component

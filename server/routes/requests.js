@@ -4,8 +4,9 @@ import {
   accountsById, canTouchBarangay, check, formatTime, fullName, httpError,
   numericId, parseRef, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
-import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { requireActiveAccount, requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
+import { LIVE_REQUEST_STATUSES, MAX_ACTIVE, docLimitFor } from "./moderation.js";
 
 const router = Router();
 const SELECT = `*, service_types(service_name, fee), ${PLACE_SELECT}`;
@@ -66,7 +67,8 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
   res.json(await withPeople(check(await query)));
 });
 
-// For Tracking via Ref Number:
+// Track a Request by its reference number (e.g. 0402104008-10-2026-00001, dashes optional) or its
+// internal id. Anyone can look one up, but only the submitter or staff of the barangay can see it.
 router.get("/:id", requireAuth, async (req, res) => {
   const ref = parseRef(req.params.id);
   if (ref && (ref.kind !== "10" || ref.update)) throw httpError(404, "Request not found.");
@@ -82,44 +84,78 @@ router.get("/:id", requireAuth, async (req, res) => {
   res.json((await withPeople([request]))[0]);
 });
 
-router.post("/", requireAuth, async (req, res) => {
-  const { service_type_id, brgy_id, purpose, appointment_date, appointment_time } = req.body ?? {};
-  if (![service_type_id, brgy_id, purpose?.trim(), appointment_date, appointment_time].every(Boolean)) {
+// Resident: request one or more documents from one barangay. Send service_type_ids (an array), or the older
+// single service_type_id. Every document becomes its own request with its own reference number.
+// Limits: the barangay's documents-per-submission cap, and MAX_ACTIVE active requests per resident.
+router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
+  const { brgy_id, purpose, appointment_date, appointment_time } = req.body ?? {};
+  const many = Array.isArray(req.body?.service_type_ids);
+  const typeIds = [...new Set((many ? req.body.service_type_ids : [req.body?.service_type_id]).filter(Boolean))];
+  if (![brgy_id, purpose?.trim(), appointment_date, appointment_time].every(Boolean) || !typeIds.length) {
     throw httpError(400, "Please fill in every field.");
   }
   if (!req.isVerified) throw httpError(403, "Only verified residents can request documents.");
 
-  const service = check(
+  const barangay = check(
+    await supabase.from("barangays").select("brgy_id, brgy_name").eq("brgy_id", brgy_id).maybeSingle(),
+  );
+  if (!barangay) throw httpError(400, "That barangay doesn't exist.");
+  const perSubmission = docLimitFor(barangay.brgy_name);
+  if (typeIds.length > perSubmission) {
+    throw httpError(400, `${barangay.brgy_name} allows up to ${perSubmission} documents per request.`);
+  }
+
+  const { count, error: countError } = await supabase
+    .from("requests")
+    .select("request_id", { count: "exact", head: true })
+    .eq("submitted_by", req.account.account_id)
+    .in("status", LIVE_REQUEST_STATUSES);
+  if (countError) throw httpError(500, countError.message);
+  if (count + typeIds.length > MAX_ACTIVE) {
+    throw httpError(
+      400,
+      `You can have at most ${MAX_ACTIVE} active document requests (you have ${count}). Wait until one is completed or rejected.`,
+    );
+  }
+
+  const services = check(
     await supabase
       .from("service_types")
       .select("service_type_id")
-      .eq("service_type_id", service_type_id)
+      .in("service_type_id", typeIds)
       .eq("brgy_id", brgy_id)
-      .eq("is_alive", true)
-      .maybeSingle(),
+      .eq("is_alive", true),
   );
-  if (!service) throw httpError(400, "That document isn't offered by the selected barangay.");
+  if (services.length !== typeIds.length) {
+    throw httpError(400, "One of those documents isn't offered by the selected barangay.");
+  }
 
-  const created = check(
-    await supabase
-      .from("requests")
-      .insert({
-        purpose: purpose.trim(),
-        appointment_date,
-        appointment_time,
-        status: "Pending",
-        submitted_by: req.account.account_id,
-        brgy_id,
-        service_type_id,
-      })
-      .select(SELECT)
-      .single(),
-  );
-  res.status(201).json((await withPeople([created]))[0]);
+  const created = [];
+  for (const service_type_id of typeIds) {
+    created.push(
+      check(
+        await supabase
+          .from("requests")
+          .insert({
+            purpose: purpose.trim(),
+            appointment_date,
+            appointment_time,
+            status: "Pending",
+            submitted_by: req.account.account_id,
+            brgy_id,
+            service_type_id,
+          })
+          .select(SELECT)
+          .single(),
+      ),
+    );
+  }
+  const result = await withPeople(created);
+  res.status(201).json(many ? result : result[0]);
 });
 
 // Staff: change a request's status. Rejecting requires a reason (min 5 characters), stored in
-//        requests.rejection_reason and cleared again if the request later moves to another status.
+// requests.rejection_reason and cleared again if the request later moves to another status.
 router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const id = numericId(req.params.id, "Request");
   const { status, reason } = req.body ?? {};

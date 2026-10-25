@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase, createAuthClient } from "../utils/supabase.js";
 import { check, httpError, PENDING, VERIFIED } from "../utils/helpers.js";
 import { ACCOUNT_SELECT, STAFF_WEIGHT, requireAuth } from "../middleware/auth.js";
+import { standingFields, standingOf } from "./moderation.js";
 
 const router = Router();
 const RESIDENT_ROLE_ID = 1;
@@ -20,6 +21,14 @@ export const toMe = (a) => ({
   role: a.roles?.role_name ?? "",
   is_staff: (a.roles?.weight ?? 0) >= STAFF_WEIGHT,
 });
+
+// toMe + the account's moderation standing (deactivation, active warnings, latest appeal)
+export const toMeWithStanding = async (a) => {
+  const me = toMe(a);
+  if (me.is_staff) return { ...me, ...standingFields({}, null) };
+  const standing = (await standingOf([a]))[a.account_id];
+  return { ...me, ...standingFields(a, standing) };
+};
 
 const tokens = (session) => ({
   access_token: session.access_token,
@@ -96,8 +105,8 @@ router.post("/refresh", async (req, res) => {
   res.json(tokens(data.session));
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  res.json(toMe(req.account));
+router.get("/me", requireAuth, async (req, res) => {
+  res.json(await toMeWithStanding(req.account));
 });
 
 router.patch("/me", requireAuth, async (req, res) => {
@@ -119,7 +128,7 @@ router.patch("/me", requireAuth, async (req, res) => {
       .select(ACCOUNT_SELECT)
       .single(),
   );
-  res.json(toMe(updated));
+  res.json(await toMeWithStanding(updated));
 });
 
 export default router;

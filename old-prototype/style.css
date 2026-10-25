@@ -191,7 +191,7 @@ small {
 }
 .btn-light {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgb(255, 255, 255);
   color: var(--white);
 }
 .btn-light:hover {
@@ -1117,24 +1117,89 @@ small {
   gap: 24px;
   margin-bottom: 24px;
 }
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.quick-actions button {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--white);
-  border: 2px solid var(--ink);
-  border-radius: 4px;
+/* clickable dashboard numbers */
+.admin-stat .stat-num {
+  display: block;
+  margin: 2px 0 2px -4px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  font: 800 2.4rem/1.1 var(--display);
+  color: var(--hall);
+  cursor: pointer;
   text-align: left;
-  font: 700 1rem var(--display);
 }
-.quick-actions button:hover {
+.admin-stat .stat-num:hover,
+.admin-stat .stat-num:focus-visible {
   background: var(--sign);
+  border-bottom-color: var(--ink);
+}
+.admin-stat .stat-sub {
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid var(--hall);
+  color: var(--hall);
+  font: inherit;
+  cursor: pointer;
+}
+.admin-stat .stat-sub strong {
+  font-weight: 800;
+}
+.admin-stat .stat-sub:hover,
+.admin-stat .stat-sub:focus-visible {
+  background: var(--sign);
+  color: var(--ink);
+}
+.row-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+/* collapsed side bar ng admin */
+.admin-layout {
+  transition: grid-template-columns 0.5s ease;
+}
+.admin-layout.collapsed {
+  grid-template-columns: 72px 1fr;
+}
+.admin-sidebar > button {
+  position: relative;
+}
+.admin-sidebar > .sidebar-toggle {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgb(255, 255, 255);
+  border-radius: 0;
+  font-size: 1.3rem;
+}
+.admin-layout.collapsed .admin-sidebar {
+  padding-inline: 8px;
+  overflow: hidden;
+}
+.admin-layout.collapsed .admin-sidebar > button {
+  justify-content: center;
+  padding-inline: 0;
+}
+.admin-layout.collapsed .admin-sidebar > button span {
+  display: none;
+}
+.admin-layout.collapsed .admin-sidebar > button i {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+}
+.admin-layout.collapsed .sidebar-bottom {
+  justify-content: center;
+  padding-inline: 0;
+}
+.admin-layout.collapsed .sidebar-bottom > div:not(.official-avatar) {
+  display: none;
 }
 .table-wrap {
   overflow-x: auto;
@@ -1403,8 +1468,19 @@ td small {
   .quick-stats > div:nth-child(-n + 2) {
     border-bottom: 1px solid var(--line);
   }
-  .admin-layout {
+  .admin-layout,
+  .admin-layout.collapsed {
     grid-template-columns: 1fr;
+  }
+  .admin-sidebar > .sidebar-toggle {
+    display: none;
+  }
+  .admin-layout.collapsed .admin-sidebar > button span {
+    display: inline;
+  }
+  .admin-layout.collapsed .admin-sidebar > button {
+    justify-content: flex-start;
+    padding-inline: 12px;
   }
   .admin-sidebar {
     flex-direction: row;
@@ -1440,8 +1516,7 @@ td small {
   .desktop-nav button {
     white-space: nowrap;
   }
-  .form-two,
-  .quick-actions {
+  .form-two {
     grid-template-columns: 1fr;
   }
   .service-card {
@@ -2128,7 +2203,7 @@ tr.row-selected {
   cursor: pointer;
 }
 .tracking-close:hover { background: var(--sign); }
-/* track categoristatus dropdown*/
+/* track dropdown*/
 .status-dropdown {
   display: flex;
   flex-wrap: wrap;
@@ -2174,4 +2249,103 @@ tr.row-selected {
 .compact-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+/* request limit */
+.form-note.limit-note {
+  border-color: #b3261e;
+  color: #7a1712;
+  background: #fdecea;
+  font-weight: 700;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* nakakainis yung resident? introducing account moderation: warnings, deactivation, appeals */
+.warning-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.warning-list li {
+  margin: 2px 0;
+}
+.warning-mark {
+  background: #b8860b;
+}
+.warning-modal {
+  text-align: left;
+}
+.deactivated-card {
+  max-width: 640px;
+  margin: 24px auto;
+  padding: 28px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+}
+.deactivated-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 12px;
+  background: #b01e2d;
+  color: #fff;
+  font: 800 1.4rem var(--display);
+  border-radius: 50%;
+}
+.reason-box {
+  margin: 16px 0;
+  padding: 14px 16px;
+  background: #fdecea;
+  border-left: 4px solid #b01e2d;
+}
+.reason-box small {
+  display: block;
+  color: var(--muted);
+  font-weight: 700;
+}
+.reason-box p {
+  margin: 6px 0;
+  font-weight: 700;
+  white-space: pre-wrap;
+}
+.appeal-status {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-left: 4px solid var(--hall);
+  background: #eef2fb;
+}
+.appeal-status p {
+  margin: 4px 0;
+}
+.appeal-denied {
+  border-left-color: #b01e2d;
+  background: #fdecea;
+}
+.appeal-quote {
+  font-style: italic;
+}
+.appeal-form {
+  margin-top: 16px;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.reason-cell {
+  max-width: 260px;
+  white-space: pre-wrap;
+}
+.appeal-note {
+  display: block;
+  max-width: 240px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-style: italic;
+}
+.row-actions .small-action {
+  flex: none;
+  min-width: max-content;
 }

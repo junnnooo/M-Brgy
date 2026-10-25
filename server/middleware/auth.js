@@ -32,6 +32,8 @@ export async function requireAuth(req, res, next) {
   req.isVerified = account.verification_status === VERIFIED;
   req.isStaff = weight >= STAFF_WEIGHT;
   req.isAdmin = weight >= ADMIN_WEIGHT;
+  // Deactivated residents can still log in (to read the reason and appeal), but can't use the services.
+  req.isDeactivated = !req.isStaff && Boolean(account.deactivated_at);
   next();
 }
 
@@ -42,5 +44,13 @@ export function requireStaff(req, res, next) {
 
 export function requireAdmin(req, res, next) {
   if (!req.isAdmin) throw httpError(403, "Admin access only.");
+  next();
+}
+
+// Use on routes that file something new (document request, concern report).
+export function requireActiveAccount(req, res, next) {
+  if (req.isDeactivated) {
+    throw httpError(403, "Your account is deactivated. You can't submit new requests or reports.");
+  }
   next();
 }

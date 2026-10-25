@@ -3,7 +3,7 @@ const { createApp } = Vue;
 const todayString = () => new Date().toISOString().slice(0, 10);
 
 // Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update>], dashes optional.
-//   10 = document request, 20 = concern report, 21 = update to a concern report.
+//                    10 = document request, 20 = concern report, 21 = update to a concern report.
 const parseRef = (value) => {
   const m = String(value ?? "")
     .replace(/\s+/g, "")
@@ -45,16 +45,44 @@ const FINAL_STATUS = {
   report: ["Resolved", "Rejected"],
 };
 
+// Account moderation + limits (the server enforces the same numbers)
+const MAX_WARNINGS = 3;
+const MAX_ACTIVE = 3;
+const LIVE_STATUS = {
+  doc: ["Pending", "Approved", "Ready for Pickup"],
+  report: ["Submitted", "Received", "In Progress"],
+};
+// Documents allowed per submission: Barangay 1 to 8 allow 2, every other barangay allows 3.
+//                                   The number is read from the barangay name, e.g. "Lantic (Barangay 13)".
+const docLimitFor = (name) => {
+  const n = Number(String(name || "").match(/barangay\s*(\d+)/i)?.[1]);
+  return n >= 1 && n <= 8 ? 2 : 3;
+};
+
+// Admin side bar: collapsed or not, remembered in this browser
+const SIDEBAR_KEY = "kabrgy_sidebar_collapsed";
+const loadSidebar = () => {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+};
+
+const blankStanding = () => ({
+  deactivated: false, deactivation_reason: "", deactivated_at: "", warnings: [], appeal: null,
+});
 const blankResident = () => ({
   first_name: "", middle_name: "", last_name: "",
   email: "", address: "", contact_number: "", verified: false,
+  ...blankStanding(),
 });
 const defaultSettings = () => ({ name: "kaBRGY", address: "", hours: "" });
 const blankSignup = () => ({ first_name: "", last_name: "", email: "", brgy_id: "", password: "", confirm: "" });
 const blankPost = () => ({ title: "", type: "Announcement", body: "", date: todayString() });
 const blankDocumentForm = () => ({
   province_id: "", municipality_id: "", brgy_id: "",
-  service_type_id: "", purpose: "", date: "", time: "",
+  service_type_ids: [], purpose: "", date: "", time: "",
 });
 const blankReportForm = () => ({
   province_id: "", municipality_id: "", brgy_id: "",
@@ -89,6 +117,7 @@ createApp({
       adminForm: { email: "", password: "" },
       page: "home",
       adminPage: "overview",
+      sidebarCollapsed: loadSidebar(),
       announcementFilter: "All",
       requestFilter: "All",
       reportFilter: "All",
@@ -102,12 +131,13 @@ createApp({
       reportSearch: "",
       docView: "active",
       reportView: "active",
-      verifFilter: "all", // all | verified | pending
+      verifFilter: "all",
       annView: "active",
-      deletingId: "", // announcement waiting for "Confirm delete"
-      docSelected: [], // bulk selection (request ids)
-      reportSelected: [], // bulk selection (report ids)
-      dismissedAlerts: loadDismissed(), // { accountId: dismissed alert id }
+      annTypeFilter: "All",
+      deletingId: "",
+      docSelected: [],
+      reportSelected: [],
+      dismissedAlerts: loadDismissed(),
 
       // Track Status: one lookup for either a document request (-10-) or a concern report (-20-/-21-)
       trackId: "",
@@ -115,15 +145,21 @@ createApp({
       trackLoading: false,
       trackSeq: 0,
       trackedItem: null,
-      docStatusFilter: "All", // Track Status: filter "My document requests" by status
-      reportStatusFilter: "All", // Track Status: filter "My concern reports" by status
-      docExpanded: false, // Track Status: "See all" / "See less"
+      docStatusFilter: "All",
+      reportStatusFilter: "All",
+      docExpanded: false,
       reportExpanded: false,
       trackLimit: 3, // rows shown before "See all"
 
       // Reject dialog: staff must give a reason before rejecting a request or a report
-      rejectDialog: null, // { kind: "doc" | "report", item, reason }
+      rejectDialog: null,
       rejectError: "",
+
+      // Account moderation: staff dialog (warn / deactivate / deny an appeal), resident appeal + warning pop-up
+      accountDialog: null,
+      accountError: "",
+      appealText: "",
+      warningAck: false,
 
       notifOpen: false,
       modal: "",
@@ -175,7 +211,14 @@ createApp({
       return [...this.archivedPosts, ...this.archivedAlerts].sort((a, b) => b.date.localeCompare(a.date));
     },
     adminAnnouncements() {
-      return this.annView === "archived" ? this.archivedAnnouncements : this.announcements;
+      const list = this.annView === "archived" ? this.archivedAnnouncements : this.announcements;
+      return list.filter((a) => this.annTypeFilter === "All" || a.type === this.annTypeFilter);
+    },
+    emergencyCount() {
+      return this.announcements.filter((a) => a.type === "Emergency").length;
+    },
+    recentAdminAnnouncements() {
+      return this.announcements.slice(0, 5);
     },
     activeAlert() {
       const now = Date.now();
@@ -191,6 +234,42 @@ createApp({
       return Boolean(
         this.me && this.activeAlert && this.dismissedAlerts[this.me.id] === this.activeAlert.id,
       );
+    },
+    // Account moderation:
+    maxWarnings() {
+      return MAX_WARNINGS;
+    },
+    activeProfiles() {
+      return this.profiles.filter((p) => !p.deactivated);
+    },
+    deactivatedProfiles() {
+      return this.profiles.filter((p) => p.deactivated);
+    },
+    pendingAppeals() {
+      return this.deactivatedProfiles.filter((p) => p.appeal && p.appeal.status === "Pending");
+    },
+    recentProfiles() {
+      return this.activeProfiles.slice(0, 5);
+    },
+    // Per-resident limits: only in-progress items count; a final status frees a slot
+    maxActiveRequests() {
+      return MAX_ACTIVE;
+    },
+    activeDocCount() {
+      return this.residentRequests.filter((r) => LIVE_STATUS.doc.includes(r.status)).length;
+    },
+    activeReportCount() {
+      return this.residentReports.filter((r) => LIVE_STATUS.report.includes(r.status)).length;
+    },
+    docLimitReached() {
+      return this.activeDocCount >= MAX_ACTIVE;
+    },
+    reportLimitReached() {
+      return this.activeReportCount >= MAX_ACTIVE;
+    },
+    docLimit() {
+      const b = this.brgys(this.documentForm).find((x) => x.brgy_id === this.documentForm.brgy_id);
+      return b ? docLimitFor(b.brgy_name) : 0;
     },
     residentRequests() {
       return this.requests;
@@ -210,10 +289,10 @@ createApp({
       );
     },
     pendingResidents() {
-      return this.profiles.filter((p) => !p.verified);
+      return this.activeProfiles.filter((p) => !p.verified);
     },
     verifiedResidents() {
-      return this.profiles.filter((p) => p.verified);
+      return this.activeProfiles.filter((p) => p.verified);
     },
     activeRequests() {
       return this.requests.filter((r) => !r.archived);
@@ -234,11 +313,15 @@ createApp({
       return this.activeReports.filter((r) => r.status !== "Resolved");
     },
     filteredProfiles() {
-      return this.profiles.filter(
-        (p) =>
-          (this.verifFilter === "all" || (this.verifFilter === "verified" ? p.verified : !p.verified)) &&
-          this.matches(this.verifSearch, [p.email, p.name, p.address]),
-      );
+      const base =
+        this.verifFilter === "deactivated"
+          ? this.deactivatedProfiles
+          : this.verifFilter === "verified"
+            ? this.verifiedResidents
+            : this.verifFilter === "pending"
+              ? this.pendingResidents
+              : this.activeProfiles;
+      return base.filter((p) => this.matches(this.verifSearch, [p.email, p.name, p.address]));
     },
     filteredRequests() {
       const list = this.docView === "archived" ? this.archivedRequests : this.activeRequests;
@@ -252,7 +335,8 @@ createApp({
       const list = this.reportView === "archived" ? this.archivedReports : this.activeReports;
       return list.filter(
         (r) =>
-          (this.reportFilter === "All" || r.status === this.reportFilter) &&
+          (this.reportFilter === "All" ||
+            (this.reportFilter === "Open" ? r.status !== "Resolved" : r.status === this.reportFilter)) &&
           this.matches(this.reportSearch, [r.email, r.name, r.ref]),
       );
     },
@@ -301,6 +385,14 @@ createApp({
     },
   },
   watch: {
+    "documentForm.brgy_id"() {
+      const max = this.docLimit;
+      const ids = this.documentForm.service_type_ids;
+      if (max && ids.length > max) {
+        this.documentForm.service_type_ids = ids.slice(0, max);
+        this.notify(`This barangay allows up to ${max} documents per request. Your selection was trimmed.`);
+      }
+    },
     // a bulk selection never survives a change of what is on screen
     docStatusFilter() { this.docExpanded = false; },
     reportStatusFilter() { this.reportExpanded = false; },
@@ -346,13 +438,36 @@ createApp({
         address: me.address,
         contact_number: me.contact_number,
         verified: me.verified,
+        ...this.standingOf(me),
       };
+      this.warningAck = !me.deactivated && me.warnings.some((w) => !w.seen);
       if (me.barangay) {
         this.settings = {
           name: me.barangay.brgy_name,
           address: me.barangay.address || "",
           hours: me.barangay.office_hours || "",
         };
+      }
+    },
+    standingOf(me) {
+      return {
+        deactivated: Boolean(me.deactivated),
+        deactivation_reason: me.deactivation_reason || "",
+        deactivated_at: me.deactivated_at || "",
+        warnings: me.warnings || [],
+        appeal: me.appeal || null,
+      };
+    },
+    // Poll for a new warning or a deactivation without touching the profile form the resident may be editing
+    async refreshStanding() {
+      if (this.role !== "resident") return;
+      try {
+        const me = await api.get("/auth/me");
+        Object.assign(this.resident, this.standingOf(me));
+        this.me = { ...this.me, ...this.standingOf(me) };
+        if (!me.deactivated && me.warnings.some((w) => !w.seen)) this.warningAck = true;
+      } catch (e) {
+        /* the next poll will try again */
       }
     },
     async loadAll() {
@@ -416,14 +531,12 @@ createApp({
     docStatusIndex(s) {
       return this.documentStatuses.indexOf(s);
     },
-    // The rejection reason as the API sends it (snake_case or camelCase)
     reasonOf(item) {
       return (item && (item.rejection_reason || item.rejectionReason)) || "";
     },
     countByStatus(list, s) {
       return s === "All" ? list.length : list.filter((r) => r.status === s).length;
     },
-    // Case-insensitive "contains" across the given fields; an empty query matches everything.
     matches(query, fields) {
       const q = (query || "").trim().toLowerCase();
       if (!q) return true;
@@ -477,7 +590,6 @@ createApp({
       }
     },
 
-    /* ---------- auth ---------- */
     setAuthView(v) {
       this.authView = v;
       this.authError = "";
@@ -577,6 +689,11 @@ createApp({
       this.docExpanded = this.reportExpanded = false;
       this.rejectDialog = null;
       this.rejectError = "";
+      this.accountDialog = null;
+      this.accountError = "";
+      this.appealText = "";
+      this.warningAck = false;
+      this.annTypeFilter = "All";
       this.deletingId = "";
       this.docSelected = [];
       this.reportSelected = [];
@@ -599,31 +716,54 @@ createApp({
     async openAppointment() {
       await this.openDocument();
       const clearance = this.services.find((s) => s.service_name === "Barangay Clearance");
-      if (clearance) this.documentForm.service_type_id = clearance.service_type_id;
+      if (clearance) this.documentForm.service_type_ids = [clearance.service_type_id];
       this.documentForm.purpose = "Appointment / document processing";
     },
+    // Checkbox rules for the document picker: never more than the barangay allows
+    docPickDisabled(id) {
+      const ids = this.documentForm.service_type_ids;
+      return !this.docLimit || (ids.length >= this.docLimit && !ids.includes(id));
+    },
     async submitDocument() {
+      if (this.resident.deactivated) return;
       if (!this.resident.verified) {
         this.page = "account";
         this.notify("Please complete resident verification first.");
         return;
       }
       const f = this.documentForm;
+      if (!f.service_type_ids.length) {
+        this.notify("Please select at least one document.");
+        return;
+      }
+      if (f.service_type_ids.length > this.docLimit) {
+        this.notify(`This barangay allows up to ${this.docLimit} documents per request.`);
+        return;
+      }
+      if (this.activeDocCount + f.service_type_ids.length > MAX_ACTIVE) {
+        this.notify(
+          `You can have at most ${MAX_ACTIVE} active document requests (you have ${this.activeDocCount}). Wait until one is completed or rejected.`,
+        );
+        return;
+      }
       try {
-        const r = await api.post("/requests", {
-          service_type_id: f.service_type_id,
+        const created = await api.post("/requests", {
+          service_type_ids: f.service_type_ids,
           brgy_id: f.brgy_id,
           purpose: f.purpose,
           appointment_date: f.date,
           appointment_time: f.time,
         });
-        this.requests.unshift(r);
-        this.modalTitle = "Request submitted";
+        this.requests.unshift(...created);
+        const refs = created.map((r) => r.ref);
+        this.modalTitle = created.length > 1 ? "Requests submitted" : "Request submitted";
         this.modalMessage =
-          "Your document request has been sent to the barangay. Keep the reference number and use Track Status to follow its progress.";
-        this.modalRef = r.ref;
+          created.length > 1
+            ? `Your ${created.length} document requests have been sent to the barangay, one reference number each. Use Track Status to follow their progress.`
+            : "Your document request has been sent to the barangay. Keep the reference number and use Track Status to follow its progress.";
+        this.modalRef = refs.join(", ");
         this.modalNext = "track";
-        this.trackId = r.ref;
+        this.trackId = refs[0];
         this.modal = "success";
         this.documentForm = blankDocumentForm();
         this.prepareForm(this.documentForm);
@@ -639,6 +779,13 @@ createApp({
       this.prepareForm(this.reportForm);
     },
     async submitReport() {
+      if (this.resident.deactivated) return;
+      if (this.reportLimitReached) {
+        this.notify(
+          `You already have ${MAX_ACTIVE} active concern reports. Wait until one is resolved or rejected.`,
+        );
+        return;
+      }
       const f = this.reportForm;
       try {
         const r = await api.post("/reports", {
@@ -683,7 +830,6 @@ createApp({
       }
     },
 
-    // Close the tracking details and clear the search box
     closeTrack() {
       this.trackSeq++;
       this.trackSearched = false;
@@ -765,6 +911,33 @@ createApp({
     },
 
     // For Admins:
+    // Dashboard numbers: jump to a page with the matching filter preset
+    goAdmin(target) {
+      const t = {
+        profiles: ["verifications", () => { this.verifFilter = "all"; }],
+        pendingVerif: ["verifications", () => { this.verifFilter = "pending"; }],
+        deactivated: ["verifications", () => { this.verifFilter = "deactivated"; }],
+        requests: ["documents", () => { this.docView = "active"; this.requestFilter = "All"; }],
+        awaiting: ["documents", () => { this.docView = "active"; this.requestFilter = "Pending"; }],
+        reports: ["reports", () => { this.reportView = "active"; this.reportFilter = "All"; }],
+        open: ["reports", () => { this.reportView = "active"; this.reportFilter = "Open"; }],
+        posts: ["posts", () => { this.annView = "active"; this.annTypeFilter = "All"; }],
+        emergency: ["posts", () => { this.annView = "active"; this.annTypeFilter = "Emergency"; }],
+        archived: ["posts", () => { this.annView = "archived"; this.annTypeFilter = "All"; }],
+      }[target];
+      if (!t) return;
+      this.verifSearch = this.docSearch = this.reportSearch = "";
+      t[1]();
+      this.adminPage = t[0];
+    },
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed;
+      try {
+        localStorage.setItem(SIDEBAR_KEY, this.sidebarCollapsed ? "1" : "0");
+      } catch (e) {
+        /* storage unavailable: the choice only lasts for this visit */
+      }
+    },
     async toggleVerified(p) {
       const next = !p.verified;
       try {
@@ -775,8 +948,80 @@ createApp({
         this.notify(e.message);
       }
     },
-    // Status changes. Rejecting needs a reason (asked in a dialog first). An archived item must be restored
-    // before its status can change. Reaching a final status archives the item automatically.
+    openAccountDialog(mode, profile) {
+      this.accountDialog = { mode, profile, reason: "" };
+      this.accountError = "";
+    },
+    closeAccountDialog() {
+      this.accountDialog = null;
+      this.accountError = "";
+    },
+    updateProfile(p, fresh) {
+      Object.assign(p, fresh);
+    },
+    async confirmAccountDialog() {
+      const d = this.accountDialog;
+      if (!d) return;
+      const reason = d.reason.trim();
+      if (reason.length < 5) {
+        this.accountError = "Please write a reason (at least 5 characters).";
+        return;
+      }
+      const path = { warn: "warnings", deactivate: "deactivate", denyAppeal: "appeal/deny" }[d.mode];
+      try {
+        const fresh = await api.post(`/accounts/${d.profile.id}/${path}`, { reason });
+        const wasActive = !d.profile.deactivated;
+        this.updateProfile(d.profile, fresh);
+        this.closeAccountDialog();
+        if (d.mode === "warn") {
+          this.notify(
+            fresh.deactivated && wasActive
+              ? `Warning ${MAX_WARNINGS} of ${MAX_WARNINGS} reached. Account deactivated`
+              : `Warning ${fresh.warnings.length} of ${MAX_WARNINGS} sent`,
+          );
+        } else {
+          this.notify(d.mode === "deactivate" ? "Account deactivated" : "Appeal denied");
+        }
+      } catch (e) {
+        this.accountError = e.message;
+      }
+    },
+    async reactivateAccount(p) {
+      try {
+        this.updateProfile(p, await api.post(`/accounts/${p.id}/reactivate`));
+        this.notify("Account reactivated");
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+    // Resident side: appeal a deactivation, and acknowledge a warning
+    async submitAppeal() {
+      const message = this.appealText.trim();
+      if (message.length < 10) {
+        this.notify("Please explain your appeal (at least 10 characters).");
+        return;
+      }
+      try {
+        const res = await api.post("/accounts/me/appeal", { message });
+        this.resident.appeal = res.appeal;
+        this.appealText = "";
+        this.notify("Appeal sent to the barangay");
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+    async acknowledgeWarnings() {
+      this.warningAck = false;
+      this.resident.warnings = this.resident.warnings.map((w) => ({ ...w, seen: true }));
+      try {
+        await api.post("/accounts/me/warnings/seen");
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+
+    // Status changes: Rejecting needs a reason (asked in a dialog first). An archived item must be restored
+    //                 before its status can change. Reaching a final status archives the item automatically.
     onStatusChange(kind, item, evt) {
       const status = evt.target.value;
       if (item.archived) {
@@ -995,10 +1240,14 @@ createApp({
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       this.notifOpen = false;
-      if (this.rejectDialog) this.closeReject();
+      if (this.accountDialog) this.closeAccountDialog();
+      else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
-    setInterval(() => this.loadNotifications(), 60000);
+    setInterval(() => {
+      this.loadNotifications();
+      this.refreshStanding();
+    }, 60000);
     this.boot();
   },
 }).mount("#app");
