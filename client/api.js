@@ -21,20 +21,42 @@ const api = {
     localStorage.removeItem(REFRESH_KEY);
   },
 
-  async refresh() {
-    if (!this.refreshToken) return false;
+  // Several requests can hit an expired token at the same moment. They all share ONE refresh call,
+  // so a rotating refresh token is never spent twice. The session is only dropped when the server
+  // actually rejects the token, not when the network blips or the server has a bad moment.
+  refresh() {
+    if (!this.refreshToken) return Promise.resolve(false);
+    if (!this._refreshing) {
+      this._refreshing = this._doRefresh().finally(() => {
+        this._refreshing = null;
+      });
+    }
+    return this._refreshing;
+  },
+
+  async _doRefresh() {
+    let res;
     try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
+      res = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: this.refreshToken }),
       });
-      if (!res.ok) throw new Error("refresh failed");
+    } catch (e) {
+      return false; // network problem: keep the session, the next request will try again
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      this.clearTokens(); // the server rejected the token: the session is really over
+      if (this.onAuthLost) this.onAuthLost();
+      return false;
+    }
+    if (!res.ok) return false; // temporary server problem: keep the session
+
+    try {
       this.setTokens(await res.json());
       return true;
     } catch (e) {
-      this.clearTokens();
-      if (this.onAuthLost) this.onAuthLost();
       return false;
     }
   },

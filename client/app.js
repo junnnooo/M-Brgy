@@ -1,6 +1,8 @@
 const { createApp } = Vue;
 
-const todayString = () => new Date().toISOString().slice(0, 10);
+// Today's date in Philippine time (YYYY-MM-DD). toISOString() is UTC, which gives yesterday's date
+// between midnight and 8 AM in Manila.
+const todayString = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 // Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update>], dashes optional.
 //                    10 = document request, 20 = concern report, 21 = update to a concern report.
@@ -162,6 +164,7 @@ createApp({
       warningAck: false,
 
       notifOpen: false,
+      menuOpen: false, // the avatar dropdown (Profile / Track Status / Log out)
       modal: "",
       modalTitle: "",
       modalMessage: "",
@@ -488,12 +491,33 @@ createApp({
         posts, alerts, notifications, requests, reports, profiles, archivedPosts, archivedAlerts,
       });
     },
-    async refreshPublic() {
-      const q = this.me?.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
-      [this.posts, this.alerts] = await Promise.all([
+    // Background refresh of the lists the signed-in user sees. Used by the polling timer.
+    async refreshLive() {
+      if (!this.me || document.visibilityState === "hidden") return;
+      try {
+        if (this.role === "resident") {
+          await Promise.all([this.loadNotifications(), this.refreshStanding()]);
+        } else {
+          await this.refreshStaffData();
+        }
+      } catch (e) {
+        /* the next poll will try again */
+      }
+    },
+    // Staff: reload the tables quietly (no error toasts) so new requests and reports show up on their own
+    async refreshStaffData() {
+      if (this.role !== "admin") return;
+      // don't swap the rows out from under a dialog the staff member is filling in
+      if (this.rejectDialog || this.accountDialog) return;
+      const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
+      const [requests, reports, profiles, posts, alerts] = await Promise.all([
+        api.get("/requests"),
+        api.get("/reports"),
+        api.get("/accounts"),
         api.get(`/announcements${q}`),
         api.get(`/alerts${q}`),
       ]);
+      Object.assign(this, { requests, reports, profiles, posts, alerts });
     },
 
     // The Helpers
@@ -549,9 +573,8 @@ createApp({
       if (m < 1) return "Just now";
       if (m < 60) return `${m}m ago`;
       const h = Math.floor(m / 60);
-      if (h == 1) return "1h ago";
       if (h < 24) return `${h}h ago`;
-      return this.formatDate(new Date(t).toISOString().slice(0, 10));
+      return this.formatDate(new Date(t).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }));
     },
     notify(msg) {
       this.toast = msg;
@@ -680,6 +703,7 @@ createApp({
       this.trackedItem = null;
       this.trackSeq++;
       this.notifOpen = false;
+      this.menuOpen = false;
       this.verifSearch = this.docSearch = this.reportSearch = "";
       this.docView = this.reportView = "active";
       this.verifFilter = "all";
@@ -868,7 +892,24 @@ createApp({
     },
     toggleNotifications() {
       this.notifOpen = !this.notifOpen;
-      if (this.notifOpen) this.loadNotifications();
+      if (this.notifOpen) {
+        this.menuOpen = false; // only one floating box open at a time
+        this.loadNotifications();
+      }
+    },
+    // Avatar dropdown
+    toggleMenu() {
+      this.menuOpen = !this.menuOpen;
+      if (this.menuOpen) this.notifOpen = false;
+    },
+    menuGo(page) {
+      this.menuOpen = false;
+      this.page = page;
+      window.scrollTo({ top: 0 });
+    },
+    menuLogout() {
+      this.menuOpen = false;
+      this.logout();
     },
     async markAllRead() {
       try {
@@ -1236,18 +1277,36 @@ createApp({
   mounted() {
     document.addEventListener("click", (e) => {
       if (this.notifOpen && !e.target.closest(".notif-wrap")) this.notifOpen = false;
+      if (this.menuOpen && !e.target.closest(".user-wrap")) this.menuOpen = false;
     });
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      // Escape first closes the account menu, and does nothing else on that press
+      if (this.menuOpen) {
+        this.menuOpen = false;
+        return;
+      }
       this.notifOpen = false;
       if (this.accountDialog) this.closeAccountDialog();
       else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
-    setInterval(() => {
-      this.loadNotifications();
-      this.refreshStanding();
-    }, 60000);
+    // Keep --header-h equal to the real header height (it changes on phones, where the nav wraps),
+    // so the sticky gold line under the hero always sits flush against the bottom of the header.
+    const bar = document.querySelector(".topbar");
+    if (bar) {
+      const setHeaderHeight = () =>
+        document.documentElement.style.setProperty("--header-h", `${bar.offsetHeight}px`);
+      setHeaderHeight();
+      if (window.ResizeObserver) new ResizeObserver(setHeaderHeight).observe(bar);
+      window.addEventListener("resize", setHeaderHeight);
+    }
+    // Poll every minute (residents: notifications + account standing, staff: the tables).
+    // Skipped while the tab is hidden, and refreshed right away when the user comes back.
+    setInterval(() => this.refreshLive(), 60000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") this.refreshLive();
+    });
     this.boot();
   },
 }).mount("#app");

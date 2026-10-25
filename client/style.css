@@ -96,6 +96,12 @@ small {
   text-decoration: none;
   color: var(--ink);
 }
+.brand-logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  flex-shrink: 0;
+}
 .brand-mark {
   display: grid;
   place-items: center;
@@ -152,6 +158,98 @@ small {
   background: var(--sign);
   border: 2px solid var(--ink);
   font: 800 1rem var(--display);
+}
+.avatar:hover,
+.avatar[aria-expanded="true"] {
+  background: var(--white);
+}
+
+/* avatar dropdown: Profile / Track Status / Log out */
+.user-wrap {
+  position: relative;
+}
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(212px, calc(100vw - 24px));
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 24px -6px rgba(15, 28, 61, 0.2),
+    0 2px 6px rgba(15, 28, 61, 0.08);
+  animation: rise 0.15s ease-out;
+}
+.user-menu-head {
+  padding: 8px 10px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.user-menu-head b,
+.user-menu-head small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-menu-head b {
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+.user-menu-head small {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.user-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.user-menu > button svg {
+  flex: none;
+  color: var(--muted);
+}
+.user-menu > button:hover {
+  background: var(--paper);
+  color: var(--hall);
+}
+.user-menu > button:hover svg {
+  color: var(--hall);
+}
+.user-menu > button.active {
+  background: #eef3fc;
+  color: var(--hall);
+}
+.user-menu > button.active svg {
+  color: var(--hall);
+}
+.user-menu-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--line);
+}
+.user-menu > .menu-logout,
+.user-menu > .menu-logout svg {
+  color: var(--tape);
+}
+.user-menu > .menu-logout:hover {
+  background: #fdecee;
+  color: #a81d2c;
+}
+.user-menu > .menu-logout:hover svg {
+  color: #a81d2c;
 }
 
 /* walang kwentang buttons */
@@ -292,7 +390,7 @@ small {
 }
 
 /* signboard */
-.hero-wrap > :not(.hero) {
+.hero-wrap > :not(.hero):not(.hero-rule) {
   max-width: 1180px;
   margin-inline: auto;
   padding-inline: var(--gutter);
@@ -305,7 +403,15 @@ small {
   padding: 64px var(--gutter) 72px;
   background: var(--hall);
   color: var(--white);
-  border-bottom: 10px solid var(--sign);
+}
+/* The gold line under the hero. It scrolls up with the blue area, then sticks right under the
+   header so it reads as the header closing off the blue. --header-h is measured in app.js. */
+.hero-rule {
+  position: sticky;
+  top: calc(var(--header-h, 78px) - 1px); /* 1px tucked under the header so no gap shows */
+  z-index: 40; /* below the header (50), above the page content */
+  height: 10px;
+  background: var(--sign);
 }
 .hero-copy {
   max-width: 640px;
@@ -1070,8 +1176,51 @@ small {
   border: 1px solid var(--line);
 }
 .admin-stat {
+  position: relative;
   padding: 22px;
   border-right: 1px solid var(--line);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.admin-stat:hover,
+.admin-stat:focus-within {
+  z-index: 1;
+  transform: translateY(-2px);
+  background: var(--white);
+  box-shadow:
+    0 1px 2px rgba(18, 48, 111, 0.05),
+    0 10px 24px -10px rgba(255, 198, 41, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-stat {
+    transition: none;
+  }
+  .admin-stat:hover,
+  .admin-stat:focus-within {
+    transform: none;
+  }
+}
+/* The label is the real button; its ::after stretches over the whole box so the entire card is clickable. */
+.stat-main {
+  display: block;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.stat-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.stat-main:focus-visible {
+  outline: none;
+}
+.stat-main:focus-visible::after {
+  outline: 3px solid var(--sign);
+  outline-offset: -3px;
 }
 .admin-stat:last-child {
   border-right: 0;
@@ -1412,6 +1561,9 @@ td small {
   }
   .brand small {
     display: none;
+  }
+  .brand-logo {
+    height: 38px;
   }
   .desktop-nav {
     order: 3;
@@ -1863,6 +2015,7 @@ td small {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
 /* Phones: stop anchoring the panel to the bell. Drop it from the header, edge to edge. */
 @media (max-width: 640px) {
   .notif-wrap {
@@ -1971,7 +2124,6 @@ tr.row-selected {
   color: var(--white);
 }
 
-/* Long reference numbers (e.g. 0402104008-10-2026-00001) wrap instead of stretching the layout */
 .ref-no,
 .record-row small,
 .eyebrow {
@@ -2104,7 +2256,7 @@ tr.row-selected {
   color: var(--ink);
 }
 
-/* A status can't be changed while the item is archived */
+
 .compact-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;

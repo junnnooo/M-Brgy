@@ -16,6 +16,7 @@
   <header class="topbar">
 
     <a class="brand" href="#" @click.prevent="role==='resident' && (page='home')">
+      <img class="brand-logo" src="assets/logos/graphic.png" alt="kaBRGY logo" />
       <span>
         <b>kaBRGY</b>
         <small>Community Services Portal</small>
@@ -26,7 +27,6 @@
       <button :class="{active:page==='home'}" @click="page='home'">Home</button>
       <button :class="{active:page==='announcements'}" @click="page='announcements'">Announcements</button>
       <button :class="{active:page==='services'}" @click="page='services'">Services</button>
-      <button :class="{active:page==='track'}" @click="page='track'">Track Status</button>
     </nav>
 
     <div v-if="role" class="header-actions">
@@ -65,9 +65,33 @@
 
       </div>
       
-      <button v-if="role==='resident' && !resident.deactivated" class="avatar" @click="page='account'" title="My account">{{ residentInitial }}</button>
-      <span v-else class="header-role">Staff Portal</span>
-      <button class="btn btn-ghost" @click="logout">Log out</button>
+      <div v-if="role==='resident' && !resident.deactivated" class="user-wrap">
+        <button class="avatar" @click="toggleMenu" :aria-expanded="menuOpen" aria-haspopup="menu" aria-label="Account menu" title="Account menu">{{ residentInitial }}</button>
+
+        <div v-if="menuOpen" class="user-menu" role="menu" aria-label="Account menu">
+          <div class="user-menu-head">
+            <b>{{ residentName || 'Resident' }}</b>
+            <small>{{ resident.email }}</small>
+          </div>
+          <button role="menuitem" :class="{active:page==='account'}" @click="menuGo('account')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            Profile
+          </button>
+          <button role="menuitem" :class="{active:page==='track'}" @click="menuGo('track')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            Track Status
+          </button>
+          <div class="user-menu-sep" role="separator"></div>
+          <button role="menuitem" class="menu-logout" @click="menuLogout">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            Log out
+          </button>
+        </div>
+      </div>
+      <template v-else>
+        <span v-if="role==='admin'" class="header-role">Staff Portal</span>
+        <button class="btn btn-ghost" @click="logout">Log out</button>
+      </template>
 
     </div>
   </header>
@@ -301,6 +325,8 @@
         </div>
 
       </div>
+
+      <div class="hero-rule" aria-hidden="true"></div>
 
       <div class="quick-stats"><div>
         <span>
@@ -559,7 +585,7 @@
             </label>
 
             <label>Barangay
-              <select v-model="documentForm.brgy_id" @change="documentForm.service_type_id='';loadServices(documentForm.brgy_id)" required>
+              <select v-model="documentForm.brgy_id" @change="documentForm.service_type_ids=[];loadServices(documentForm.brgy_id)" required>
                 <option value="" disabled>Select barangay</option>
                 <option v-for="b in brgys(documentForm)" :key="b.brgy_id" :value="b.brgy_id">{{b.brgy_name}}</option>
               </select>
@@ -773,8 +799,7 @@
 
           <br>
           <small>{{trackedItem.data.barangay ? trackedItem.data.barangay + ' Barangay, ' : ''}}
-            {{trackedItem.data.municipality || 'Carmona'}}, 
-            {{trackedItem.data.province || 'Cavite'}}</small>
+            {{[trackedItem.data.municipality, trackedItem.data.province].filter(Boolean).join(', ')}}</small>
           
           </div>
           
@@ -824,8 +849,7 @@
           <br>
           <small>
             {{trackedItem.data.barangay ? trackedItem.data.barangay + ' Barangay, ' : ''}}
-            {{trackedItem.data.municipality || 'Carmona'}}, 
-            {{trackedItem.data.province || 'Cavite'}}</small>
+            {{[trackedItem.data.municipality, trackedItem.data.province].filter(Boolean).join(', ')}}</small>
 
         </div>
         
@@ -1009,8 +1033,7 @@
 
           <b>One-time on-site verification</b>
           <p>After saving your profile, visit your barangay hall with a valid ID or proof of address. 
-            An official will review your details and update your verification status. 
-            log in with the admin account to mark this profile verified.
+            An official will review your details and update your verification status.
           </p>
 
         </div>
@@ -1077,15 +1100,7 @@
           </p>
 
         </article>
-        
-        <article class="manual-card">
 
-          <span>06</span>
-          <h3>Testttrt</h3>
-          <p>Test palang to.</p>
-
-        </article>
-      
       </div>
     
     </section>
@@ -1159,29 +1174,29 @@
         <div class="admin-stat-grid">
 
           <div class="admin-stat">
-            <small>Resident profiles</small>
-            <button type="button" class="stat-num" @click="goAdmin('profiles')" title="View all resident profiles">{{activeProfiles.length}}</button>
-            <em><button type="button" class="stat-sub" @click="goAdmin('pendingVerif')" title="View residents pending verification"><strong>{{pendingResidents.length}}</strong></button> Pending verification ·
-              <button type="button" class="stat-sub" @click="goAdmin('deactivated')" title="View deactivated accounts"><strong>{{deactivatedProfiles.length}}</strong></button> deactivated<template v-if="pendingAppeals.length"> ({{pendingAppeals.length}} appeal)</template></em>
+            <button type="button" class="stat-main" @click="goAdmin('profiles')" title="View all resident profiles">Resident profiles</button>
+            <b>{{activeProfiles.length}}</b>
+            <em><strong>{{pendingResidents.length}}</strong> Pending verification ·
+              <strong>{{deactivatedProfiles.length}}</strong> deactivated<template v-if="pendingAppeals.length"> ({{pendingAppeals.length}} appeal)</template></em>
           </div>
 
           <div class="admin-stat">
-            <small>Document requests</small>
-            <button type="button" class="stat-num" @click="goAdmin('requests')" title="View all document requests">{{requests.length}}</button>
-            <em><button type="button" class="stat-sub" @click="goAdmin('awaiting')" title="View requests awaiting review"><strong>{{pendingRequests.length}}</strong></button> Awaiting review</em>
+            <button type="button" class="stat-main" @click="goAdmin('requests')" title="View all document requests">Document requests</button>
+            <b>{{requests.length}}</b>
+            <em><strong>{{pendingRequests.length}}</strong> Awaiting review</em>
           </div>
 
           <div class="admin-stat">
-            <small>Concern reports</small>
-            <button type="button" class="stat-num" @click="goAdmin('reports')" title="View all concern reports">{{reports.length}}</button>
-            <em><button type="button" class="stat-sub" @click="goAdmin('open')" title="View reports that are still open"><strong>{{openReports.length}}</strong></button> Still open</em>
+            <button type="button" class="stat-main" @click="goAdmin('reports')" title="View all concern reports">Concern reports</button>
+            <b>{{reports.length}}</b>
+            <em><strong>{{openReports.length}}</strong> Still open</em>
           </div>
 
           <div class="admin-stat">
-            <small>Public posts</small>
-            <button type="button" class="stat-num" @click="goAdmin('posts')" title="View all public posts">{{announcements.length}}</button>
-            <em><button type="button" class="stat-sub" @click="goAdmin('emergency')" title="View emergency alerts"><strong>{{emergencyCount}}</strong></button> Emergency alerts ·
-              <button type="button" class="stat-sub" @click="goAdmin('archived')" title="View archived posts"><strong>{{archivedAnnouncements.length}}</strong></button> Archived</em>
+            <button type="button" class="stat-main" @click="goAdmin('posts')" title="View all public posts">Public posts</button>
+            <b>{{announcements.length}}</b>
+            <em><strong>{{emergencyCount}}</strong> Emergency alerts ·
+              <strong>{{archivedAnnouncements.length}}</strong> Archived</em>
           </div>
 
         </div>
@@ -1738,7 +1753,7 @@
           <h3>Barangay settings</h3>
         </div>
         
-        <p>Adjust the displayed community name d ko alam ano sunod</p>
+        <p>Update the barangay name, office address, and office hours shown to residents.</p>
         <form class="form-card settings-form" @submit.prevent="saveSettings">
 
           <label>Barangay / community name
@@ -1756,16 +1771,7 @@
           <button class="btn btn-primary" type="submit">Save settings</button>
         
         </form>
-        
-        <div class="notice-card">
-          <span class="notice-symbol">i</span>
-          <div>
-            <b>Test alert</b>
-            <p>hello world</p>
-          </div>
-        
-        </div>
-      
+
       </section>
 
     </div>

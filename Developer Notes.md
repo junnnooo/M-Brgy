@@ -6,6 +6,18 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 2.0.1
+With the recent major update, there has also come some small updates
+
+    (+) Added a new dropdown for the profile
+    (+) Added the Logo of kaBRGY
+
+    (~) Small Bug Fixes reguarding codes inside client folder
+    (~ | -) Removed Track Status and Moved inside the new dropdown for profile 
+    (~) Fixed Admin Panel where the numbers are the clickable ones in the dashboard not the div box that houses them
+    (~) Small Quality of Life Changes
+
+
 ## Version: 2.0.0 (MAJOR UPDATE)
 
 Residents Panel:
