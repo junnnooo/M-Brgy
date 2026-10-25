@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
-import { check, httpError, numericId, toDay, canTouchBarangay } from "../utils/helpers.js";
+import { check, httpError, numericId, toDay, canTouchBarangay, scopeToBarangay } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
 
 const router = Router();
@@ -16,11 +16,22 @@ const toAlert = (a) => ({
   starts_at: a.starts_at,
   expires_at: a.expires_at,
   date: toDay(a.starts_at),
+  archived: Boolean(a.archived_at),
 });
 
+// Public: archived alerts are never returned here
 router.get("/", async (req, res) => {
-  let query = supabase.from("alerts").select("*").order("starts_at", { ascending: false });
+  let query = supabase.from("alerts").select("*").is("archived_at", null).order("starts_at", { ascending: false });
   if (req.query.brgy_id) query = query.eq("brgy_id", String(req.query.brgy_id));
+  res.json(check(await query).map(toAlert));
+});
+
+// Staff: archived alerts of their barangay (hidden from residents)
+router.get("/archived", requireAuth, requireStaff, async (req, res) => {
+  const query = scopeToBarangay(
+    supabase.from("alerts").select("*").not("archived_at", "is", null).order("starts_at", { ascending: false }),
+    req.account,
+  );
   res.json(check(await query).map(toAlert));
 });
 
@@ -35,7 +46,7 @@ router.post("/", requireAuth, requireStaff, async (req, res) => {
       .insert({
         title: title.trim(),
         message: body.trim(),
-        severity: "Critical", // the alerts table only accepts Info / Warning / Critical
+        severity: "Critical",
         starts_at: new Date().toISOString(),
         brgy_id: req.account.brgy_id,
         sent_by: req.account.account_id,
@@ -44,6 +55,30 @@ router.post("/", requireAuth, requireStaff, async (req, res) => {
       .single(),
   );
   res.status(201).json(toAlert(created));
+});
+
+// Staff: take an alert off the public board (or put it back). Needs alerts.archived_at.
+router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+  const id = numericId(req.params.id, "Alert");
+  const { archived } = req.body ?? {};
+  if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");
+
+  const existing = check(
+    await supabase.from("alerts").select("alert_id, brgy_id").eq("alert_id", id).maybeSingle(),
+  );
+  if (!existing || !canTouchBarangay(req.account, existing.brgy_id)) {
+    throw httpError(404, "Alert not found.");
+  }
+
+  const updated = check(
+    await supabase
+      .from("alerts")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("alert_id", id)
+      .select()
+      .single(),
+  );
+  res.json(toAlert(updated));
 });
 
 router.delete("/:id", requireAuth, requireStaff, async (req, res) => {

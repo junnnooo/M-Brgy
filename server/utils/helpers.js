@@ -21,6 +21,18 @@ export function numericId(value, label = "Record") {
   return n;
 }
 
+// Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update 2 digits>]
+//   10 = document request, 20 = concern report, 21 = an update to a concern report.
+// Accepts the number with or without dashes. Returns null if it isn't a reference number.
+export function parseRef(value) {
+  const m = String(value ?? "")
+    .replace(/\s+/g, "")
+    .match(/^(\d{10})-?(\d{2})-?(\d{4})-?(\d{5})(?:-?(\d{2,}))?$/);
+  if (!m) return null;
+  const [, brgy, kind, year, no, update] = m;
+  return { brgy, kind, year, no, update: update ?? null, base: `${brgy}-${kind}-${year}-${no}` };
+}
+
 // Full Name: Returns the full name of a person from their first, middle, and last names, or an empty string if not provided.
 export const fullName = (a) =>
   a ? [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(" ") : "";

@@ -2,25 +2,26 @@ import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
 import {
   accountsById, canTouchBarangay, check, fullName, httpError, numericId,
-  placeOf, PLACE_SELECT, scopeToBarangay, toDay,
+  parseRef, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 
 const router = Router();
 const SELECT = `*, ${PLACE_SELECT}`;
-const STATUSES = ["Submitted", "Received", "In Progress", "Resolved"];
+const STATUSES = ["Submitted", "Received", "In Progress", "Resolved", "Rejected"];
 
 const toReport = (r, people = {}) => {
   const a = people[r.account_id];
   return {
     id: r.report_id,
-    ref: `REP-${r.report_id}`,
+    ref: r.ref_no,
     category: r.category,
     title: r.title,
     description: r.description,
     location: r.location_details,
     status: r.status,
+    rejection_reason: r.rejection_reason ?? "",
     created: toDay(r.created_at),
     updated: toDay(r.created_at),
     archived: Boolean(r.archived_at),
@@ -69,24 +70,29 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
   res.json(await withPeople(check(await query)));
 });
 
-// Track one report: Reference numbers are sequential, so only the owner or staff may read one.
+// For Tracking via Ref Number:
 router.get("/:id", requireAuth, async (req, res) => {
-  const id = numericId(req.params.id, "Report");
-  const report = check(await supabase.from("reports").select(SELECT).eq("report_id", id).maybeSingle());
+  const ref = parseRef(req.params.id);
+  if (ref && !["20", "21"].includes(ref.kind)) throw httpError(404, "Report not found.");
+  const lookup = ref
+    ? supabase.from("reports").select(SELECT).eq("ref_no", `${ref.brgy}-20-${ref.year}-${ref.no}`)
+    : supabase.from("reports").select(SELECT).eq("report_id", numericId(req.params.id, "Report"));
+  const report = check(await lookup.maybeSingle());
   const allowed =
     report &&
     (report.account_id === req.account.account_id ||
       (req.isStaff && canTouchBarangay(req.account, report.brgy_id)));
   if (!allowed) throw httpError(404, "Report not found.");
 
+  const id = report.report_id;
   const updates = check(
-    await supabase.from("report_updates").select("*").eq("report_id", id).order("updated_at"),
+    await supabase.from("report_updates").select("*").eq("report_id", id).order("updated_at").order("update_id"),
   );
   const people = await accountsById([report.account_id]);
   res.json({
     ...toReport(report, people),
     updated: toDay(updates.at(-1)?.updated_at) || toDay(report.created_at),
-    history: updates.map((u) => ({ status: u.status, remark: u.remark, date: toDay(u.updated_at) })),
+    history: updates.map((u) => ({ ref: u.ref_no, status: u.status, remark: u.remark, date: toDay(u.updated_at) })),
   });
 });
 
@@ -114,10 +120,17 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json((await withPeople([created]))[0]);
 });
 
+// Staff: change a report's status. Rejecting requires a reason (min 5 characters), which is stored on the
+//        report (rejection_reason) and in the report's history (report_updates.remark).
 router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const id = numericId(req.params.id, "Report");
-  const { status, remark } = req.body ?? {};
+  const { status, remark, reason } = req.body ?? {};
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
+
+  const rejectReason = typeof reason === "string" ? reason.trim() : "";
+  if (status === "Rejected" && rejectReason.length < 5) {
+    throw httpError(400, "Please give a reason for the rejection (at least 5 characters).");
+  }
 
   const existing = check(
     await supabase
@@ -131,14 +144,21 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   }
 
   const updated = check(
-    await supabase.from("reports").update({ status }).eq("report_id", id).select(SELECT).single(),
+    await supabase
+      .from("reports")
+      .update({ status, rejection_reason: status === "Rejected" ? rejectReason : null })
+      .eq("report_id", id)
+      .select(SELECT)
+      .single(),
   );
-  const log = await logUpdate(id, status, remark?.trim() || `Status changed to ${status}.`, req.account.account_id);
+  const logRemark =
+    (status === "Rejected" ? rejectReason : remark?.trim()) || `Status changed to ${status}.`;
+  const log = await logUpdate(id, status, logRemark, req.account.account_id);
 
   if (existing.status !== status) {
     await notifyAccount(
       existing.account_id,
-      `Your report "${updated.category}" (REP-${id}) is now ${status}.`,
+      `Your report "${updated.category}" (${updated.ref_no}) is now ${status}.`,
       { updateId: log.update_id },
     );
   }

@@ -15,12 +15,12 @@ const TITLES = {
 
 // Notification:
 const toNotification = (n) => {
-  const reportId = n.report_updates?.report_id;
-  const kind = n.request_id ? "document" : reportId ? "report" : n.alert_id ? "alert" : "account";
+  const update = n.report_updates;
+  const kind = n.request_id ? "document" : update ? "report" : n.alert_id ? "alert" : "account";
   return {
     id: n.notification_id,
     kind,
-    ref: n.request_id ? `DOC-${n.request_id}` : reportId ? `REP-${reportId}` : "",
+    ref: n.requests?.ref_no ?? update?.reports?.ref_no ?? "",
     title: TITLES[kind],
     message: n.message,
     read: Boolean(n.is_read),
@@ -39,8 +39,17 @@ router.get("/", requireAuth, async (req, res) => {
       .order("created_at", { ascending: false })
       .limit(LIMIT);
 
-  let result = await list("*, report_updates(report_id)");
-  if (result.error) result = await list("*");
+  // Join the request / report so each notification can show its reference number.
+  // Older databases without notifications.update_id fall back to the simpler selects.
+  let result;
+  for (const columns of [
+    "*, requests(ref_no), report_updates(report_id, reports(ref_no))",
+    "*, requests(ref_no)",
+    "*",
+  ]) {
+    result = await list(columns);
+    if (!result.error) break;
+  }
   res.json(check(result).map(toNotification));
 });
 

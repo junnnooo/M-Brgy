@@ -2,6 +2,34 @@ const { createApp } = Vue;
 
 const todayString = () => new Date().toISOString().slice(0, 10);
 
+// Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update>], dashes optional.
+//   10 = document request, 20 = concern report, 21 = update to a concern report.
+const parseRef = (value) => {
+  const m = String(value ?? "")
+    .replace(/\s+/g, "")
+    .match(/^(\d{10})-?(\d{2})-?(\d{4})-?(\d{5})(?:-?(\d{2,}))?$/);
+  if (!m) return null;
+  const [, brgy, type, year, no, update] = m;
+  return { type, canonical: `${brgy}-${type}-${year}-${no}${update ? "-" + update : ""}` };
+};
+
+// Dismissed emergency banner: remembered per resident account, in this browser only
+const DISMISSED_KEY = "kabrgy_dismissed_alerts";
+const loadDismissed = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DISMISSED_KEY) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+};
+const saveDismissed = (map) => {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(map));
+  } catch (e) {
+    /* storage unavailable: the dismissal only lasts for this visit */
+  }
+};
+
 const TIME_SLOTS = [
   { value: "08:00", label: "8:00 AM" },
   { value: "09:00", label: "9:00 AM" },
@@ -10,6 +38,12 @@ const TIME_SLOTS = [
   { value: "14:00", label: "2:00 PM" },
   { value: "15:00", label: "3:00 PM" },
 ];
+
+// Reaching one of these statuses is final: the item is moved to the archive automatically.
+const FINAL_STATUS = {
+  doc: ["Completed", "Rejected"],
+  report: ["Resolved", "Rejected"],
+};
 
 const blankResident = () => ({
   first_name: "", middle_name: "", last_name: "",
@@ -44,6 +78,8 @@ createApp({
       reports: [],
       profiles: [],
       notifications: [],
+      archivedPosts: [], // staff only: archived announcements (hidden from residents)
+      archivedAlerts: [], // staff only: archived emergency alerts
 
       authView: "resident",
       authMode: "login",
@@ -55,6 +91,7 @@ createApp({
       adminPage: "overview",
       announcementFilter: "All",
       requestFilter: "All",
+      reportFilter: "All",
       documentForm: blankDocumentForm(),
       reportForm: blankReportForm(),
       postForm: blankPost(),
@@ -65,13 +102,28 @@ createApp({
       reportSearch: "",
       docView: "active",
       reportView: "active",
+      verifFilter: "all", // all | verified | pending
+      annView: "active",
+      deletingId: "", // announcement waiting for "Confirm delete"
+      docSelected: [], // bulk selection (request ids)
+      reportSelected: [], // bulk selection (report ids)
+      dismissedAlerts: loadDismissed(), // { accountId: dismissed alert id }
 
-      // Track Status: one lookup for either a document request (DOC-) or a concern report (REP-)
+      // Track Status: one lookup for either a document request (-10-) or a concern report (-20-/-21-)
       trackId: "",
       trackSearched: false,
       trackLoading: false,
       trackSeq: 0,
       trackedItem: null,
+      docStatusFilter: "All", // Track Status: filter "My document requests" by status
+      reportStatusFilter: "All", // Track Status: filter "My concern reports" by status
+      docExpanded: false, // Track Status: "See all" / "See less"
+      reportExpanded: false,
+      trackLimit: 3, // rows shown before "See all"
+
+      // Reject dialog: staff must give a reason before rejecting a request or a report
+      rejectDialog: null, // { kind: "doc" | "report", item, reason }
+      rejectError: "",
 
       notifOpen: false,
       modal: "",
@@ -119,6 +171,12 @@ createApp({
     latestAnnouncements() {
       return this.announcements.slice(0, 3);
     },
+    archivedAnnouncements() {
+      return [...this.archivedPosts, ...this.archivedAlerts].sort((a, b) => b.date.localeCompare(a.date));
+    },
+    adminAnnouncements() {
+      return this.annView === "archived" ? this.archivedAnnouncements : this.announcements;
+    },
     activeAlert() {
       const now = Date.now();
       return (
@@ -127,6 +185,11 @@ createApp({
             new Date(a.starts_at).getTime() <= now &&
             (!a.expires_at || new Date(a.expires_at).getTime() > now),
         ) || null
+      );
+    },
+    emergencyDismissed() {
+      return Boolean(
+        this.me && this.activeAlert && this.dismissedAlerts[this.me.id] === this.activeAlert.id,
       );
     },
     residentRequests() {
@@ -149,6 +212,9 @@ createApp({
     pendingResidents() {
       return this.profiles.filter((p) => !p.verified);
     },
+    verifiedResidents() {
+      return this.profiles.filter((p) => p.verified);
+    },
     activeRequests() {
       return this.requests.filter((r) => !r.archived);
     },
@@ -168,7 +234,11 @@ createApp({
       return this.activeReports.filter((r) => r.status !== "Resolved");
     },
     filteredProfiles() {
-      return this.profiles.filter((p) => this.matches(this.verifSearch, [p.email, p.name, p.address]));
+      return this.profiles.filter(
+        (p) =>
+          (this.verifFilter === "all" || (this.verifFilter === "verified" ? p.verified : !p.verified)) &&
+          this.matches(this.verifSearch, [p.email, p.name, p.address]),
+      );
     },
     filteredRequests() {
       const list = this.docView === "archived" ? this.archivedRequests : this.activeRequests;
@@ -180,13 +250,44 @@ createApp({
     },
     filteredReports() {
       const list = this.reportView === "archived" ? this.archivedReports : this.activeReports;
-      return list.filter((r) => this.matches(this.reportSearch, [r.email, r.name, r.ref]));
+      return list.filter(
+        (r) =>
+          (this.reportFilter === "All" || r.status === this.reportFilter) &&
+          this.matches(this.reportSearch, [r.email, r.name, r.ref]),
+      );
     },
     documentStatuses() {
       return ["Pending", "Approved", "Ready for Pickup", "Completed"];
     },
     reportStatuses() {
       return ["Submitted", "Received", "In Progress", "Resolved"];
+    },
+    // Track Status lists: status dropdown, and "See all" / "See less"
+    docFilterOptions() {
+      return ["All", ...this.documentStatuses, "Rejected"];
+    },
+    reportFilterOptions() {
+      return ["All", ...this.reportStatuses, "Rejected"];
+    },
+    filteredResidentRequests() {
+      return this.residentRequests.filter(
+        (r) => this.docStatusFilter === "All" || r.status === this.docStatusFilter,
+      );
+    },
+    filteredResidentReports() {
+      return this.residentReports.filter(
+        (r) => this.reportStatusFilter === "All" || r.status === this.reportStatusFilter,
+      );
+    },
+    visibleRequests() {
+      return this.docExpanded
+        ? this.filteredResidentRequests
+        : this.filteredResidentRequests.slice(0, this.trackLimit);
+    },
+    visibleReports() {
+      return this.reportExpanded
+        ? this.filteredResidentReports
+        : this.filteredResidentReports.slice(0, this.trackLimit);
     },
     adminTitle() {
       return {
@@ -198,6 +299,18 @@ createApp({
         settings: "Barangay settings",
       }[this.adminPage];
     },
+  },
+  watch: {
+    // a bulk selection never survives a change of what is on screen
+    docStatusFilter() { this.docExpanded = false; },
+    reportStatusFilter() { this.reportExpanded = false; },
+    docView() { this.docSelected = []; },
+    requestFilter() { this.docSelected = []; },
+    docSearch() { this.docSelected = []; },
+    reportView() { this.reportSelected = []; },
+    reportFilter() { this.reportSelected = []; },
+    reportSearch() { this.reportSelected = []; },
+    adminPage() { this.docSelected = []; this.reportSelected = []; },
   },
   methods: {
     // The Session: On boot, check if the user is logged in and load their session data,
@@ -245,15 +358,20 @@ createApp({
     async loadAll() {
       const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
       const staff = this.role === "admin";
-      const [posts, alerts, notifications, requests, reports, profiles] = await Promise.all([
-        api.get(`/announcements${q}`),
-        api.get(`/alerts${q}`),
-        api.get("/notifications"),
-        api.get(staff ? "/requests" : "/requests/mine"),
-        api.get(staff ? "/reports" : "/reports/mine"),
-        staff ? api.get("/accounts") : Promise.resolve([]),
-      ]);
-      Object.assign(this, { posts, alerts, notifications, requests, reports, profiles });
+      const [posts, alerts, notifications, requests, reports, profiles, archivedPosts, archivedAlerts] =
+        await Promise.all([
+          api.get(`/announcements${q}`),
+          api.get(`/alerts${q}`),
+          api.get("/notifications"),
+          api.get(staff ? "/requests" : "/requests/mine"),
+          api.get(staff ? "/reports" : "/reports/mine"),
+          staff ? api.get("/accounts") : Promise.resolve([]),
+          staff ? api.get("/announcements/archived") : Promise.resolve([]),
+          staff ? api.get("/alerts/archived") : Promise.resolve([]),
+        ]);
+      Object.assign(this, {
+        posts, alerts, notifications, requests, reports, profiles, archivedPosts, archivedAlerts,
+      });
     },
     async refreshPublic() {
       const q = this.me?.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
@@ -297,6 +415,13 @@ createApp({
     },
     docStatusIndex(s) {
       return this.documentStatuses.indexOf(s);
+    },
+    // The rejection reason as the API sends it (snake_case or camelCase)
+    reasonOf(item) {
+      return (item && (item.rejection_reason || item.rejectionReason)) || "";
+    },
+    countByStatus(list, s) {
+      return s === "All" ? list.length : list.filter((r) => r.status === s).length;
     },
     // Case-insensitive "contains" across the given fields; an empty query matches everything.
     matches(query, fields) {
@@ -433,6 +558,7 @@ createApp({
       this.settings = defaultSettings();
       Object.assign(this, {
         services: [], posts: [], alerts: [], requests: [], reports: [], profiles: [], notifications: [],
+        archivedPosts: [], archivedAlerts: [],
       });
       this.documentForm = blankDocumentForm();
       this.reportForm = blankReportForm();
@@ -444,6 +570,16 @@ createApp({
       this.notifOpen = false;
       this.verifSearch = this.docSearch = this.reportSearch = "";
       this.docView = this.reportView = "active";
+      this.verifFilter = "all";
+      this.annView = "active";
+      this.reportFilter = "All";
+      this.docStatusFilter = this.reportStatusFilter = "All";
+      this.docExpanded = this.reportExpanded = false;
+      this.rejectDialog = null;
+      this.rejectError = "";
+      this.deletingId = "";
+      this.docSelected = [];
+      this.reportSelected = [];
       this.page = "home";
       this.adminPage = "overview";
       this.authView = wasAdmin ? "admin" : "resident";
@@ -526,34 +662,34 @@ createApp({
       }
     },
 
-    // Track Status: DOC-<n> looks up a document request, REP-<n> a concern report.
-    //               A bare number could be either, so it tries the report first and then the request.
+    // Track Status: the reference number says what it is. -10- is a document request, -20- a concern
+    //               report, -21- an update to a concern report (it opens that report).
     async trackSearch() {
       const seq = ++this.trackSeq;
       this.trackSearched = true;
       this.trackedItem = null;
-      const raw = String(this.trackId).trim().toUpperCase();
-      const n = parseInt(raw.replace(/\D/g, ""), 10);
-      if (!n) return;
+      const ref = parseRef(this.trackId);
+      const kind = ref?.type === "10" ? "document" : ref?.type === "20" || ref?.type === "21" ? "report" : "";
+      if (!kind) return;
 
-      const kinds = raw.startsWith("DOC") ? ["document"] : raw.startsWith("REP") ? ["report"] : ["report", "document"];
       this.trackLoading = true;
       try {
-        for (const kind of kinds) {
-          try {
-            const data = await api.get(kind === "report" ? `/reports/${n}` : `/requests/${n}`);
-            if (seq === this.trackSeq) this.trackedItem = { kind, data };
-            return;
-          } catch (e) {
-            if (e.status !== 404) {
-              if (seq === this.trackSeq) this.notify(e.message);
-              return;
-            }
-          }
-        }
+        const data = await api.get(`${kind === "report" ? "/reports" : "/requests"}/${ref.canonical}`);
+        if (seq === this.trackSeq) this.trackedItem = { kind, data };
+      } catch (e) {
+        if (e.status !== 404 && seq === this.trackSeq) this.notify(e.message);
       } finally {
         if (seq === this.trackSeq) this.trackLoading = false;
       }
+    },
+
+    // Close the tracking details and clear the search box
+    closeTrack() {
+      this.trackSeq++;
+      this.trackSearched = false;
+      this.trackLoading = false;
+      this.trackedItem = null;
+      this.trackId = "";
     },
 
     // Residents Profile:
@@ -639,22 +775,68 @@ createApp({
         this.notify(e.message);
       }
     },
-    async updateRequest(r, status, evt) {
-      try {
-        Object.assign(r, await api.patch(`/requests/${r.id}/status`, { status }));
-        this.notify("Document request updated");
-      } catch (e) {
-        if (evt) evt.target.value = r.status;
-        this.notify(e.message);
+    // Status changes. Rejecting needs a reason (asked in a dialog first). An archived item must be restored
+    // before its status can change. Reaching a final status archives the item automatically.
+    onStatusChange(kind, item, evt) {
+      const status = evt.target.value;
+      if (item.archived) {
+        evt.target.value = item.status;
+        this.notify(`Restore this ${kind === "doc" ? "request" : "report"} first to change its status`);
+        return;
       }
+      if (status === "Rejected") {
+        evt.target.value = item.status;
+        this.openReject(kind, item);
+        return;
+      }
+      return this.applyStatus(kind, item, status, "", evt);
     },
-    async updateReport(r, status, evt) {
+    openReject(kind, item) {
+      this.rejectDialog = { kind, item, reason: "" };
+      this.rejectError = "";
+      this.$nextTick(() => {
+        if (this.$refs.rejectReason) this.$refs.rejectReason.focus();
+      });
+    },
+    closeReject() {
+      this.rejectDialog = null;
+      this.rejectError = "";
+    },
+    async confirmReject() {
+      const d = this.rejectDialog;
+      if (!d) return;
+      const reason = d.reason.trim();
+      if (reason.length < 5) {
+        this.rejectError = "Please enter a reason for the rejection (at least 5 characters).";
+        return;
+      }
+      this.closeReject();
+      await this.applyStatus(d.kind, d.item, "Rejected", reason);
+    },
+    async applyStatus(kind, item, status, reason = "", evt = null) {
+      if (item.status === status) return;
+      const isDoc = kind === "doc";
+      const path = isDoc ? "requests" : "reports";
+      const label = isDoc ? "Document request" : "Concern report";
       try {
-        Object.assign(r, await api.patch(`/reports/${r.id}/status`, { status }));
-        this.notify("Concern report status updated");
+        const body = status === "Rejected" ? { status, reason } : { status };
+        Object.assign(item, await api.patch(`/${path}/${item.id}/status`, body));
       } catch (e) {
-        if (evt) evt.target.value = r.status;
+        if (evt) evt.target.value = item.status;
         this.notify(e.message);
+        return;
+      }
+      if (!FINAL_STATUS[kind].includes(status) || item.archived) {
+        this.notify(isDoc ? "Document request updated" : "Concern report status updated");
+        return;
+      }
+      try {
+        Object.assign(item, await api.patch(`/${path}/${item.id}/archive`, { archived: true }));
+        if (isDoc) this.docSelected = this.docSelected.filter((id) => id !== item.id);
+        else this.reportSelected = this.reportSelected.filter((id) => id !== item.id);
+        this.notify(`${label} ${status.toLowerCase()} and moved to Archive`);
+      } catch (e) {
+        this.notify(`${label} ${status.toLowerCase()}, but it could not be archived: ${e.message}`);
       }
     },
     async toggleArchive(item, kind) {
@@ -669,6 +851,78 @@ createApp({
       } catch (e) {
         this.notify(e.message);
       }
+    },
+    // Bulk selection: tick rows, then archive (or restore) them in one go
+    visibleFor(kind) {
+      return kind === "doc" ? this.filteredRequests : this.filteredReports;
+    },
+    selectedFor(kind) {
+      return kind === "doc" ? this.docSelected : this.reportSelected;
+    },
+    allSelected(kind) {
+      const rows = this.visibleFor(kind);
+      const selected = this.selectedFor(kind);
+      return rows.length > 0 && rows.every((r) => selected.includes(r.id));
+    },
+    toggleAll(kind) {
+      const ids = this.allSelected(kind) ? [] : this.visibleFor(kind).map((r) => r.id);
+      if (kind === "doc") this.docSelected = ids;
+      else this.reportSelected = ids;
+    },
+    clearSelection(kind) {
+      if (kind === "doc") this.docSelected = [];
+      else this.reportSelected = [];
+    },
+    async bulkArchive(kind) {
+      const isDoc = kind === "doc";
+      const ids = this.selectedFor(kind);
+      if (!ids.length) return;
+      const archiving = (isDoc ? this.docView : this.reportView) === "active";
+      const targets = (isDoc ? this.requests : this.reports).filter((r) => ids.includes(r.id));
+      const results = await Promise.allSettled(
+        targets.map((r) => api.patch(`/${isDoc ? "requests" : "reports"}/${r.id}/archive`, { archived: archiving })),
+      );
+      let done = 0;
+      results.forEach((res, i) => {
+        if (res.status === "fulfilled") {
+          Object.assign(targets[i], res.value);
+          done++;
+        }
+      });
+      this.clearSelection(kind);
+      const noun = isDoc ? "document request" : "concern report";
+      const failed = results.length - done;
+      this.notify(
+        failed
+          ? `${done} ${noun}${done === 1 ? "" : "s"} updated, ${failed} failed. Please try again.`
+          : `${done} ${noun}${done === 1 ? "" : "s"} ${archiving ? "archived" : "restored"}`,
+      );
+    },
+
+    // Announcements & alerts: archive / restore, and inline delete confirmation
+    annKey(a) {
+      return `${a.kind}-${a.id}`;
+    },
+    async archiveAnnouncement(a) {
+      const isAlert = a.kind === "alert";
+      const archiving = !a.archived;
+      try {
+        const updated = await api.patch(`/${isAlert ? "alerts" : "announcements"}/${a.id}/archive`, {
+          archived: archiving,
+        });
+        const [live, archived] = isAlert ? ["alerts", "archivedAlerts"] : ["posts", "archivedPosts"];
+        const [from, to] = archiving ? [live, archived] : [archived, live];
+        this[from] = this[from].filter((x) => x.id !== a.id);
+        this[to] = [updated, ...this[to]];
+        this.notify(archiving ? "Announcement archived" : "Announcement restored");
+      } catch (e) {
+        this.notify(e.message);
+      }
+    },
+    dismissEmergency() {
+      if (!this.me || !this.activeAlert) return;
+      this.dismissedAlerts = { ...this.dismissedAlerts, [this.me.id]: this.activeAlert.id };
+      saveDismissed(this.dismissedAlerts);
     },
     async publishAnnouncement() {
       const f = this.postForm;
@@ -688,18 +942,21 @@ createApp({
       }
     },
     async deleteAnnouncement(a) {
-      if (!confirm("Delete this announcement from the board?")) return;
       try {
         if (a.kind === "alert") {
           await api.del(`/alerts/${a.id}`);
           this.alerts = this.alerts.filter((x) => x.id !== a.id);
+          this.archivedAlerts = this.archivedAlerts.filter((x) => x.id !== a.id);
         } else {
           await api.del(`/announcements/${a.id}`);
           this.posts = this.posts.filter((x) => x.id !== a.id);
+          this.archivedPosts = this.archivedPosts.filter((x) => x.id !== a.id);
         }
         this.notify("Announcement deleted");
       } catch (e) {
         this.notify(e.message);
+      } finally {
+        this.deletingId = "";
       }
     },
     async saveSettings() {
@@ -736,7 +993,10 @@ createApp({
       if (this.notifOpen && !e.target.closest(".notif-wrap")) this.notifOpen = false;
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.notifOpen = false;
+      if (e.key !== "Escape") return;
+      this.notifOpen = false;
+      if (this.rejectDialog) this.closeReject();
+      else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
     setInterval(() => this.loadNotifications(), 60000);
     this.boot();

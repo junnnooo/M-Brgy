@@ -2,7 +2,7 @@ import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
 import {
   accountsById, canTouchBarangay, check, formatTime, fullName, httpError,
-  numericId, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
+  numericId, parseRef, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
@@ -22,13 +22,14 @@ const toRequest = (r, people = {}) => {
   const a = people[r.submitted_by];
   return {
     id: r.request_id,
-    ref: `DOC-${r.request_id}`,
+    ref: r.ref_no,
     type: r.service_types?.service_name ?? "",
     fee: r.service_types?.fee ?? 0,
     purpose: r.purpose,
     date: r.appointment_date,
     time: formatTime(r.appointment_time),
     status: r.status,
+    rejection_reason: r.rejection_reason ?? "",
     created: toDay(r.created_at),
     updated: toDay(r.updated_at ?? r.ready_at ?? r.created_at),
     archived: Boolean(r.archived_at),
@@ -65,11 +66,14 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
   res.json(await withPeople(check(await query)));
 });
 
-// Track a Request: anyone can look up a request by its ID, but only the submitter or staff of the barangay can see it.
-//                  Either DOC-## for Documents or REQ-## for Reports
+// For Tracking via Ref Number:
 router.get("/:id", requireAuth, async (req, res) => {
-  const id = numericId(req.params.id, "Request");
-  const request = check(await supabase.from("requests").select(SELECT).eq("request_id", id).maybeSingle());
+  const ref = parseRef(req.params.id);
+  if (ref && (ref.kind !== "10" || ref.update)) throw httpError(404, "Request not found.");
+  const lookup = ref
+    ? supabase.from("requests").select(SELECT).eq("ref_no", ref.base)
+    : supabase.from("requests").select(SELECT).eq("request_id", numericId(req.params.id, "Request"));
+  const request = check(await lookup.maybeSingle());
   const allowed =
     request &&
     (request.submitted_by === req.account.account_id ||
@@ -114,10 +118,17 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json((await withPeople([created]))[0]);
 });
 
+// Staff: change a request's status. Rejecting requires a reason (min 5 characters), stored in
+//        requests.rejection_reason and cleared again if the request later moves to another status.
 router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const id = numericId(req.params.id, "Request");
-  const { status } = req.body ?? {};
+  const { status, reason } = req.body ?? {};
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
+
+  const rejectReason = typeof reason === "string" ? reason.trim() : "";
+  if (status === "Rejected" && rejectReason.length < 5) {
+    throw httpError(400, "Please give a reason for the rejection (at least 5 characters).");
+  }
 
   const existing = check(
     await supabase
@@ -131,7 +142,11 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   }
 
   const changed = existing.status !== status;
-  const patch = { status, processed_by: req.account.account_id };
+  const patch = {
+    status,
+    processed_by: req.account.account_id,
+    rejection_reason: status === "Rejected" ? rejectReason : null,
+  };
   if (changed && status === "Ready for Pickup") patch.ready_at = new Date().toISOString();
 
   const updated = check(
@@ -141,7 +156,7 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   if (changed) {
     await notifyAccount(
       existing.submitted_by,
-      `${updated.service_types?.service_name ?? "Your document"} (DOC-${id}) ${STATUS_MESSAGES[status]}`,
+      `${updated.service_types?.service_name ?? "Your document"} (${updated.ref_no}) ${STATUS_MESSAGES[status]}`,
       { requestId: id },
     );
   }

@@ -6,11 +6,45 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
-## Version: 1.0.3-d
-(+ | ~) Added and Updated new "old-prototype" for preparation for the emergency update
+## Version: 1.1.2
+(+ | ~) Added and Updated Small Features for Quality of Life Changes
 
-(* | ~) Prividous Bug in the Residents Panel, Mobile Bus, is still not resolved
-(*) New Bug, Reseidents View, Notifications in the incident/consernt report is not comming though
+(~) Fixed bug on Reject Option due to the changes in the Current Database
+
+## Version: 1.1.1 (MAJOR UPDATE)
+(+) Added a new table in the Database [ref_counters] to house the reference numbers of each different type of request and concerns
+(+) Added a new option in request called "Rejected"
+(+) Added a way to see why the document is Rejected
+(+) Added a Close option in the Emergency Announcements in Residents View
+(+) Added a Category Section in the Track Status
+(+) Added a new Select button in the admin document request and concern reports. Can multi select multiple request and concerns
+(+) Added a way to Delete announcements, as well as a safety net "confirm delete"
+(+) Added an Archive feature in Announcements
+(+) Added a category inside residents verification where it separates Pending and Verified uses, for better organization
+(+) Added a feature in Admin where when rejecting a concern, Admin needs to provide a reason, also has a default input if admin has no reason to input
+(+) Added a feature in Admin where a request or a concern is labeled as Completed, Resolved, or Rejected, the request or concern will automatically be archived.
+
+(↑) Updated The Database to house the new added features as well as to handel the new Refferences
+
+(~) Reformated the Formatting of client/index.htm
+(~) Fixed Positioning on the Footer in the Announcement "Schedule" Section.
+(~) New Limit to how much documents you can request in one Request form. From 1 to 3 documents
+(~) Fix a Silent Bug, Where Archived request or concerns status can still be changed
+
+(*) Bug on Reject Option due to the changes in the Current Database
+        Discovered: The Error is comming from the wrong packaging and wrong hook in the routes/reports.js
+
+## Version: 1.0.4
+(↑) Updated client folder to fix the new old-prototype files
+
+(~) Fixed Bug in Residents Panel, Mobile Bug, Notification dropdown overflowing is now fixed
+(~) Fixed Bug in Residents Panel, Notifications in the incident/consern report is now coming though
+
+## Version: 1.0.3-d
+(+ | ↑) Added and Updated new "old-prototype" for preparation for the emergency update
+
+(* | ~) Prividous Bug in the Residents Panel, Mobile Bug, is still not resolved
+(*) New Bug, Reseidents View, Notifications in the incident/consern report is not comming though
         Discovered: The notification being updated is the "Verified account"
 
 Mini-Update to incorporate the new elements in preparation for the migration of new Client designs
@@ -51,6 +85,13 @@ Mini-Update to incorporate the new elements in preparation for the migration of 
 
 ## Version: 1.0.3-a
 (↑) Updated client Files to fit the new "old-prototype" files
+
+(+) Added a Search bar in Admin accounts to easily find gmail accounts of residents
+(+) Added a Archived Button and Archive section for both Requests and Conserns
+
+(~) A sight changes to wordings, Changed "Track a Report" to "Track Status"
+
+(-) Removed the "Location Tracker" inside Track Status
 
 (*) System has encountered Bugs from Notifications to reports, request and finally accounts of the user
 (*) System is currently buggy in the client/app.js, Fixing this will be the priority for the next update
