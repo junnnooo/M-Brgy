@@ -1360,26 +1360,54 @@ td small {
 .footer-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
-.footer-brand b {
+.footer-text b {
   display: block;
   color: var(--white);
-  font-family: var(--display);
+  font: 800 1.15rem/1.1 var(--display);
+  font-stretch: 115%;
 }
-.footer-brand small {
+.footer-text small {
   display: block;
+  margin-top: 4px;
 }
-.footer-brand .brand-mark {
-  background: var(--sign);
-  color: var(--ink);
+.footer-logo {
+  display: block;
+  height: clamp(84px, 8vw, 104px); /* smaller, still readable */
+  width: auto;
+  padding: 4px;
+  background: var(--white); /* light plate so the navy logo is readable */
+  border: 0; /* no gold frame */
+  border-radius: 6px;
+  opacity: 0.88; /* dims the white so it blends into the navy instead of glaring */
+  transition: opacity 0.2s;
 }
-.footer-brand .brand-mark span {
-  color: var(--hall);
+.footer-logo:hover {
+  opacity: 1;
 }
 .footer-links {
   display: flex;
   gap: 20px;
+}
+@media (max-width: 640px) {
+  .site-footer {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+  .footer-brand {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .footer-logo {
+    height: auto;
+    width: min(150px, 40vw); /* compact, centered on phones */
+  }
+  .footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 .footer-links button {
   background: none;

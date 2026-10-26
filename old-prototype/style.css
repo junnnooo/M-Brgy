@@ -96,6 +96,12 @@ small {
   text-decoration: none;
   color: var(--ink);
 }
+.brand-logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  flex-shrink: 0;
+}
 .brand-mark {
   display: grid;
   place-items: center;
@@ -153,6 +159,98 @@ small {
   border: 2px solid var(--ink);
   font: 800 1rem var(--display);
 }
+.avatar:hover,
+.avatar[aria-expanded="true"] {
+  background: var(--white);
+}
+
+/* avatar dropdown: Profile / Track Status / Log out */
+.user-wrap {
+  position: relative;
+}
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(212px, calc(100vw - 24px));
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 24px -6px rgba(15, 28, 61, 0.2),
+    0 2px 6px rgba(15, 28, 61, 0.08);
+  animation: rise 0.15s ease-out;
+}
+.user-menu-head {
+  padding: 8px 10px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.user-menu-head b,
+.user-menu-head small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-menu-head b {
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+.user-menu-head small {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.user-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.user-menu > button svg {
+  flex: none;
+  color: var(--muted);
+}
+.user-menu > button:hover {
+  background: var(--paper);
+  color: var(--hall);
+}
+.user-menu > button:hover svg {
+  color: var(--hall);
+}
+.user-menu > button.active {
+  background: #eef3fc;
+  color: var(--hall);
+}
+.user-menu > button.active svg {
+  color: var(--hall);
+}
+.user-menu-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--line);
+}
+.user-menu > .menu-logout,
+.user-menu > .menu-logout svg {
+  color: var(--tape);
+}
+.user-menu > .menu-logout:hover {
+  background: #fdecee;
+  color: #a81d2c;
+}
+.user-menu > .menu-logout:hover svg {
+  color: #a81d2c;
+}
 
 /* walang kwentang buttons */
 .btn {
@@ -191,7 +289,7 @@ small {
 }
 .btn-light {
   background: transparent;
-  border-color: rgb(255, 255, 255);
+  border-color: rgba(255, 255, 255, 0.55);
   color: var(--white);
 }
 .btn-light:hover {
@@ -290,29 +388,9 @@ small {
     box-shadow: 0 0 0 12px rgba(255, 255, 255, 0);
   }
 }
-.resident-notifications {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  padding: 12px var(--gutter);
-  background: #e1e9fa;
-  border-bottom: 1px solid var(--line);
-}
-.resident-notifications span {
-  display: block;
-}
-.resident-notifications button {
-  background: var(--hall);
-  color: var(--white);
-  border: 0;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-weight: 700;
-}
 
 /* signboard */
-.hero-wrap > :not(.hero) {
+.hero-wrap > :not(.hero):not(.hero-rule) {
   max-width: 1180px;
   margin-inline: auto;
   padding-inline: var(--gutter);
@@ -325,7 +403,15 @@ small {
   padding: 64px var(--gutter) 72px;
   background: var(--hall);
   color: var(--white);
-  border-bottom: 10px solid var(--sign);
+}
+/* The gold line under the hero. It scrolls up with the blue area, then sticks right under the
+   header so it reads as the header closing off the blue. --header-h is measured in app.js. */
+.hero-rule {
+  position: sticky;
+  top: calc(var(--header-h, 78px) - 1px); /* 1px tucked under the header so no gap shows */
+  z-index: 40; /* below the header (50), above the page content */
+  height: 10px;
+  background: var(--sign);
 }
 .hero-copy {
   max-width: 640px;
@@ -1090,8 +1176,51 @@ small {
   border: 1px solid var(--line);
 }
 .admin-stat {
+  position: relative;
   padding: 22px;
   border-right: 1px solid var(--line);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.admin-stat:hover,
+.admin-stat:focus-within {
+  z-index: 1;
+  transform: translateY(-2px);
+  background: var(--white);
+  box-shadow:
+    0 1px 2px rgba(18, 48, 111, 0.05),
+    0 10px 24px -10px rgba(255, 198, 41, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-stat {
+    transition: none;
+  }
+  .admin-stat:hover,
+  .admin-stat:focus-within {
+    transform: none;
+  }
+}
+/* The label is the real button; its ::after stretches over the whole box so the entire card is clickable. */
+.stat-main {
+  display: block;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.stat-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.stat-main:focus-visible {
+  outline: none;
+}
+.stat-main:focus-visible::after {
+  outline: 3px solid var(--sign);
+  outline-offset: -3px;
 }
 .admin-stat:last-child {
   border-right: 0;
@@ -1117,89 +1246,24 @@ small {
   gap: 24px;
   margin-bottom: 24px;
 }
-/* clickable dashboard numbers */
-.admin-stat .stat-num {
-  display: block;
-  margin: 2px 0 2px -4px;
-  padding: 0 4px;
-  background: none;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  font: 800 2.4rem/1.1 var(--display);
-  color: var(--hall);
-  cursor: pointer;
-  text-align: left;
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
-.admin-stat .stat-num:hover,
-.admin-stat .stat-num:focus-visible {
-  background: var(--sign);
-  border-bottom-color: var(--ink);
-}
-.admin-stat .stat-sub {
-  padding: 0 4px;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid var(--hall);
-  color: var(--hall);
-  font: inherit;
-  cursor: pointer;
-}
-.admin-stat .stat-sub strong {
-  font-weight: 800;
-}
-.admin-stat .stat-sub:hover,
-.admin-stat .stat-sub:focus-visible {
-  background: var(--sign);
-  color: var(--ink);
-}
-.row-end {
+.quick-actions button {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  flex: none;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  text-align: left;
+  font: 700 1rem var(--display);
 }
-/* collapsed side bar ng admin */
-.admin-layout {
-  transition: grid-template-columns 0.5s ease;
-}
-.admin-layout.collapsed {
-  grid-template-columns: 72px 1fr;
-}
-.admin-sidebar > button {
-  position: relative;
-}
-.admin-sidebar > .sidebar-toggle {
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgb(255, 255, 255);
-  border-radius: 0;
-  font-size: 1.3rem;
-}
-.admin-layout.collapsed .admin-sidebar {
-  padding-inline: 8px;
-  overflow: hidden;
-}
-.admin-layout.collapsed .admin-sidebar > button {
-  justify-content: center;
-  padding-inline: 0;
-}
-.admin-layout.collapsed .admin-sidebar > button span {
-  display: none;
-}
-.admin-layout.collapsed .admin-sidebar > button i {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  min-width: 18px;
-  padding: 0 5px;
-  font-size: 0.7rem;
-}
-.admin-layout.collapsed .sidebar-bottom {
-  justify-content: center;
-  padding-inline: 0;
-}
-.admin-layout.collapsed .sidebar-bottom > div:not(.official-avatar) {
-  display: none;
+.quick-actions button:hover {
+  background: var(--sign);
 }
 .table-wrap {
   overflow-x: auto;
@@ -1403,9 +1467,11 @@ td small {
   color: var(--muted);
 }
 .reference-box b {
-  font: 800 1.5rem var(--display);
-  letter-spacing: 0.04em;
+  font: 800 1.2rem var(--display);
+  letter-spacing: 0.02em;
   color: var(--hall);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .reference-box button {
   background: none;
@@ -1468,19 +1534,8 @@ td small {
   .quick-stats > div:nth-child(-n + 2) {
     border-bottom: 1px solid var(--line);
   }
-  .admin-layout,
-  .admin-layout.collapsed {
+  .admin-layout {
     grid-template-columns: 1fr;
-  }
-  .admin-sidebar > .sidebar-toggle {
-    display: none;
-  }
-  .admin-layout.collapsed .admin-sidebar > button span {
-    display: inline;
-  }
-  .admin-layout.collapsed .admin-sidebar > button {
-    justify-content: flex-start;
-    padding-inline: 12px;
   }
   .admin-sidebar {
     flex-direction: row;
@@ -1507,6 +1562,9 @@ td small {
   .brand small {
     display: none;
   }
+  .brand-logo {
+    height: 38px;
+  }
   .desktop-nav {
     order: 3;
     width: 100%;
@@ -1516,7 +1574,8 @@ td small {
   .desktop-nav button {
     white-space: nowrap;
   }
-  .form-two {
+  .form-two,
+  .quick-actions {
     grid-template-columns: 1fr;
   }
   .service-card {
@@ -1717,7 +1776,8 @@ td small {
   font-weight: 700;
   font-size: 0.95rem;
 }
-.auth-form input {
+.auth-form input,
+.auth-form select {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -1728,7 +1788,8 @@ td small {
   border-radius: 4px;
   font-weight: 400;
 }
-.auth-form input:focus {
+.auth-form input:focus,
+.auth-form select:focus {
   border-color: var(--hall);
   outline: 3px solid var(--sign);
   outline-offset: 0;
@@ -1745,7 +1806,7 @@ td small {
   margin: 20px 0 0;
   color: var(--muted);
 }
-.creds {
+.demo-creds {
   display: grid;
   gap: 2px;
   margin-top: 22px;
@@ -1753,10 +1814,10 @@ td small {
   border: 2px dashed rgba(255, 255, 255, 0.35);
   font-size: 0.95rem;
 }
-.creds span {
+.demo-creds span {
   color: #c8d4f0;
 }
-.creds code {
+.demo-creds code {
   padding: 1px 6px;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 2px;
@@ -1805,85 +1866,9 @@ td small {
     border-bottom: 10px solid var(--sign);
   }
 }
-/* emegency bannerr */
-.emergency-banner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px var(--gutter) 18px;
-  background: var(--tape);
-  color: var(--white);
-}
-.emergency-banner::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 6px;
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--white) 0 10px,
-    var(--tape) 10px 20px
-  );
-}
-.emergency-banner b {
-  margin-right: 10px;
-}
-.emergency-banner button {
-  margin-left: auto;
-  background: var(--white);
-  color: var(--tape);
-  border: 0;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-weight: 700;
-}
 
-/* Emergency alert dismiss control */
-.emergency-copy {
-  min-width: 0;
-  flex: 1;
-}
-.emergency-copy > span {
-  display: block;
-}
-.emergency-banner .emergency-details {
-  flex: none;
-}
-.emergency-banner .emergency-dismiss {
-  flex: none;
-  margin-left: 0;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--white);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  border-radius: 4px;
-  font-size: 1.6rem;
-  line-height: 1;
-}
-.emergency-banner .emergency-dismiss:hover {
-  background: var(--white);
-  color: var(--tape);
-}
-@media (max-width: 640px) {
-  .emergency-banner {
-    flex-wrap: wrap;
-  }
-  .emergency-copy {
-    flex-basis: calc(100% - 30px);
-  }
-  .emergency-banner .emergency-details {
-    margin-left: 24px;
-  }
-}
 
-/* admin search bar to */
+/* ---- admin search + archive views ---- */
 .admin-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2022,13 +2007,74 @@ td small {
   font-style: normal;
   color: var(--muted);
 }
+/* Never wider than the screen, whatever the device */
+.notif-panel {
+  max-width: calc(100vw - 24px);
+}
+.notif-item > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Phones: stop anchoring the panel to the bell. Drop it from the header, edge to edge. */
 @media (max-width: 640px) {
+  .notif-wrap {
+    position: static;
+  }
   .notif-panel {
-    right: -90px;
+    top: 100%;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+  .notif-head {
+    flex-wrap: wrap;
+  }
+  .notif-list {
+    max-height: min(380px, 60vh);
+  }
+}
+/* Emergency alert dismiss control (from beta) */
+.emergency-copy {
+  min-width: 0;
+  flex: 1;
+}
+.emergency-copy > span {
+  display: block;
+}
+.emergency-banner .emergency-details {
+  flex: none;
+}
+.emergency-banner .emergency-dismiss {
+  flex: none;
+  margin-left: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--white);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.emergency-banner .emergency-dismiss:hover {
+  background: var(--white);
+  color: var(--tape);
+}
+@media (max-width: 640px) {
+  .emergency-copy {
+    flex-basis: calc(100% - 30px);
+  }
+  .emergency-banner .emergency-details {
+    margin-left: 24px;
   }
 }
 
-/* annoment action*/
+/* Bulk select, announcement actions (from beta) */
 .check-cell {
   width: 44px;
   text-align: center;
@@ -2078,47 +2124,13 @@ tr.row-selected {
   color: var(--white);
 }
 
-/* docs pickerr */
-.doc-picker {
-  margin: 0 0 18px;
-  padding: 14px 16px;
-  border: 2px solid var(--field);
-  border-radius: 4px;
-}
-.doc-picker legend {
-  padding: 0 6px;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-.form-card .doc-picker label.check-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  padding: 9px 4px;
-  font-weight: 400;
-  cursor: pointer;
-}
-.form-card .doc-picker label.check-option.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.form-card .doc-picker input[type="checkbox"] {
-  display: inline-block;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  padding: 0;
-  accent-color: var(--hall);
-}
-.doc-picker small {
-  display: block;
-  margin-top: 6px;
+.ref-no,
+.record-row small,
+.eyebrow {
+  overflow-wrap: anywhere;
 }
 
-
-/* reason ng rejection */
+/* Reason for a rejection (from beta) */
 .reject-modal { text-align: left; }
 .reject-modal h2 { padding-right: 28px; }
 .reject-modal label { display: block; margin-top: 16px; font-weight: 700; }
@@ -2183,7 +2195,7 @@ tr.row-selected {
   overflow: hidden;
 }
 
-/* sa track stastus exit, status filter, see all or see less */
+/* Track Status: close details, status filter, see all / see less (from beta) */
 .tracking-result { position: relative; }
 .tracking-toolbar {
   display: flex;
@@ -2203,7 +2215,6 @@ tr.row-selected {
   cursor: pointer;
 }
 .tracking-close:hover { background: var(--sign); }
-/* track dropdown*/
 .status-dropdown {
   display: flex;
   flex-wrap: wrap;
@@ -2245,107 +2256,8 @@ tr.row-selected {
   color: var(--ink);
 }
 
-/* disable yung status sa archived  */
+
 .compact-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-/* request limit */
-.form-note.limit-note {
-  border-color: #b3261e;
-  color: #7a1712;
-  background: #fdecea;
-  font-weight: 700;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-/* nakakainis yung resident? introducing account moderation: warnings, deactivation, appeals */
-.warning-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-}
-.warning-list li {
-  margin: 2px 0;
-}
-.warning-mark {
-  background: #b8860b;
-}
-.warning-modal {
-  text-align: left;
-}
-.deactivated-card {
-  max-width: 640px;
-  margin: 24px auto;
-  padding: 28px;
-  background: var(--white);
-  border: 2px solid var(--ink);
-  border-radius: 4px;
-}
-.deactivated-icon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 12px;
-  background: #b01e2d;
-  color: #fff;
-  font: 800 1.4rem var(--display);
-  border-radius: 50%;
-}
-.reason-box {
-  margin: 16px 0;
-  padding: 14px 16px;
-  background: #fdecea;
-  border-left: 4px solid #b01e2d;
-}
-.reason-box small {
-  display: block;
-  color: var(--muted);
-  font-weight: 700;
-}
-.reason-box p {
-  margin: 6px 0;
-  font-weight: 700;
-  white-space: pre-wrap;
-}
-.appeal-status {
-  margin: 16px 0;
-  padding: 14px 16px;
-  border-left: 4px solid var(--hall);
-  background: #eef2fb;
-}
-.appeal-status p {
-  margin: 4px 0;
-}
-.appeal-denied {
-  border-left-color: #b01e2d;
-  background: #fdecea;
-}
-.appeal-quote {
-  font-style: italic;
-}
-.appeal-form {
-  margin-top: 16px;
-}
-.row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.reason-cell {
-  max-width: 260px;
-  white-space: pre-wrap;
-}
-.appeal-note {
-  display: block;
-  max-width: 240px;
-  margin-top: 4px;
-  color: var(--muted);
-  font-style: italic;
-}
-.row-actions .small-action {
-  flex: none;
-  min-width: max-content;
 }

@@ -6,6 +6,28 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 2.1.1
+
+    (~) Fixed Bug in Combo boxes, Database, Routes, Not Properly Hooked Up
+    (~) Fixed Bug in Nav Bar, "Home" and "Baranagy" Option Is Not Responsive, Does Not Update
+    (~) Fixed Bug in The Hero Boxes In The Bottom Where It Redirects You to the User Guide On A Logged In Account As A "Resident"
+    (~) Fixed Bug in the Footer Where The Logo Is Not Dynamically Sizing
+
+## Version: 2.1.0 (SEMI-MINOR UPDATE)
+
+    (+) Added a Landing Page [still incomplete]
+
+    (*) Bug in Combo boxes, Database, Routes, Not Properly Hooked Up
+    (*) Bug in Nav Bar, "Home" and "Baranagy" Option Is Not Responsive, Does Not Update
+    (*) Bug in The Hero Boxes In The Bottom Where It Redirects You to the User Guide On A Logged In Account As A "Resident"
+    (*) Bug in the Footer Where The Logo Is Not Dynamically Sizing
+
+## Version: 2.0.2
+
+    (*) Small UI Bug, Appointent documents, The service_name and checkbox is not alight with one another, Must fix
+    (*) Small Routing Bug, When logged out as a resident, it doesn't set you back to the Landing page
+    (*) Small Account Bug, When logged out as an account, it relogins you to a "Resident" [The dummy account]
+
 ## Version: 2.0.1
 With the recent major update, there has also come some small updates
 
@@ -16,7 +38,6 @@ With the recent major update, there has also come some small updates
     (~ | -) Removed Track Status and Moved inside the new dropdown for profile 
     (~) Fixed Admin Panel where the numbers are the clickable ones in the dashboard not the div box that houses them
     (~) Small Quality of Life Changes
-
 
 ## Version: 2.0.0 (MAJOR UPDATE)
 

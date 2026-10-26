@@ -1275,6 +1275,8 @@ createApp({
     },
   },
   mounted() {
+    // Landing page "Sign Up" button opens this page with ?mode=signup
+    if (new URLSearchParams(location.search).get("mode") === "signup") this.authMode = "signup";
     document.addEventListener("click", (e) => {
       if (this.notifOpen && !e.target.closest(".notif-wrap")) this.notifOpen = false;
       if (this.menuOpen && !e.target.closest(".user-wrap")) this.menuOpen = false;
