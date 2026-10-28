@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#12306F" />
   <title>kaBRGY | Community Services</title>
+  <link rel="icon" href="../assets/logos/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
@@ -15,7 +16,9 @@
 <div id="app">
   <header class="topbar">
 
-    <a class="brand" href="#" @click.prevent="role==='resident' && (page='home')">
+    <!-- Logged out: the logo is a normal link to the landing page (../ = site root).
+         Logged in: the link is cancelled and behaves as before (residents go to Home). -->
+    <a class="brand" :href="role ? '#' : '../'" @click="role && $event.preventDefault(); role==='resident' && (page='home')">
       <img class="brand-logo" src="../assets/logos/logo.png" alt="kaBRGY logo" />
       <span>
         <b>kaBRGY</b>
@@ -96,7 +99,9 @@
     </div>
   </header>
 
-  <div v-if="role==='resident' && !resident.deactivated && activeAlert && !emergencyDismissed" class="emergency-banner" role="alert">
+  <transition :css="false" @enter="bannerEnter" @leave="bannerLeave">
+  <div v-if="role==='resident' && !resident.deactivated && activeAlert && !emergencyDismissed">
+  <div class="emergency-banner topbar" role="alert">
     <span class="pulse"></span>
     <div class="emergency-copy">
       <b>{{activeAlert.title}}</b>
@@ -106,6 +111,8 @@
     <button class="emergency-details" @click="page='announcements'">View details →</button>
     <button class="emergency-dismiss" @click="dismissEmergency" aria-label="Dismiss emergency alert" title="Dismiss alert">×</button>
   </div>
+  </div>
+  </transition>
 
   <main v-if="booting" class="auth-page">
     <div class="empty-state">Loading kaBRGY…</div>
@@ -139,7 +146,13 @@
               </label>
 
               <label>Password
-                <input v-model="loginForm.password" type="password" required autocomplete="current-password" placeholder="Your password" />
+                <span class="pw-field">
+                  <input v-model="loginForm.password" :type="showPw.login ? 'text' : 'password'" required autocomplete="current-password" placeholder="Your password" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.login}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('login')">
+                    <svg v-if="!showPw.login" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
               </label>
 
               <div v-if="authError" class="auth-error" role="alert">{{authError}}</div>
@@ -173,11 +186,23 @@
               </label>
 
               <label>Password
-                <input v-model="signupForm.password" type="password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" />
+                <span class="pw-field">
+                  <input v-model="signupForm.password" :type="showPw.signup ? 'text' : 'password'" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.signup}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('signup')">
+                    <svg v-if="!showPw.signup" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
               </label>
 
               <label>Confirm password
-                <input v-model="signupForm.confirm" type="password" required autocomplete="new-password" placeholder="Type the password again" />
+                <span class="pw-field">
+                  <input v-model="signupForm.confirm" :type="showPw.confirm ? 'text' : 'password'" required autocomplete="new-password" placeholder="Type the password again" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.confirm}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('confirm')">
+                    <svg v-if="!showPw.confirm" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
               </label>
 
               <div v-if="authError" class="auth-error" role="alert">{{authError}}</div>
@@ -203,7 +228,13 @@
               </label>
 
               <label>Password
-                <input v-model="adminForm.password" type="password" required autocomplete="current-password" placeholder="Admin password" />
+                <span class="pw-field">
+                  <input v-model="adminForm.password" :type="showPw.admin ? 'text' : 'password'" required autocomplete="current-password" placeholder="Admin password" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.admin}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('admin')">
+                    <svg v-if="!showPw.admin" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
               </label>
 
               <div v-if="authError" class="auth-error" role="alert">{{authError}}</div>
@@ -552,27 +583,33 @@
       
       <form v-else class="form-card" @submit.prevent="submitDocument">
         <div class="location-picker">
-          <h3>Service location</h3>
-          <p class="muted">Select your province, municipality, and barangay.</p>
+          <div class="location-head">
+            <div>
+              <h3>Service location</h3>
+              <p class="muted">{{ docLocationLocked ? 'Filled in from your registered barangay.' : 'Select your province, municipality, and barangay.' }}</p>
+            </div>
+            <button v-if="docLocationLocked" type="button" class="small-action" @click="askChangeLocation('doc')">Change location</button>
+            <button v-else-if="me && me.brgy_id" type="button" class="text-link" @click="lockDocLocation">Use my barangay</button>
+          </div>
           
           <div class="form-three">
 
             <label>Province
-              <select v-model="documentForm.province_id" @change="documentForm.municipality_id='';documentForm.brgy_id=''" required>
+              <select v-model="documentForm.province_id" :disabled="docLocationLocked" @change="documentForm.municipality_id='';documentForm.brgy_id=''" required>
                 <option value="" disabled>Select province</option>
                 <option v-for="p in locations" :key="p.province_id" :value="p.province_id">{{p.province_name}}</option>
               </select>
             </label>
 
             <label>Municipality
-              <select v-model="documentForm.municipality_id" @change="documentForm.brgy_id=''" required>
+              <select v-model="documentForm.municipality_id" :disabled="docLocationLocked" @change="documentForm.brgy_id=''" required>
                 <option value="" disabled>Select municipality</option>
                 <option v-for="m in munis(documentForm)" :key="m.municipality_id" :value="m.municipality_id">{{m.municipality_name}}</option>
               </select>
             </label>
 
             <label>Barangay
-              <select v-model="documentForm.brgy_id" @change="documentForm.service_type_ids=[];loadServices(documentForm.brgy_id)" required>
+              <select v-model="documentForm.brgy_id" :disabled="docLocationLocked" @change="documentForm.service_type_ids=[];loadServices(documentForm.brgy_id)" required>
                 <option value="" disabled>Select barangay</option>
                 <option v-for="b in brgys(documentForm)" :key="b.brgy_id" :value="b.brgy_id">{{b.brgy_name}}</option>
               </select>
@@ -588,12 +625,10 @@
             <span class="muted">({{docLimit ? 'select 1 to '+docLimit : 'choose your barangay first'}})</span>
           </legend>
 
-          <!-- Test Area: Need to fix, Dapat align yung Service name sa Check box -->
           <label v-for="sv in services" :key="sv.service_type_id" :class="['check-option',{disabled:docPickDisabled(sv.service_type_id)}]">
-            <div>{{sv.service_name}} <input type="checkbox" v-model="documentForm.service_type_ids" :value="sv.service_type_id" :disabled="docPickDisabled(sv.service_type_id)" /> </div>
-            
+            <input type="checkbox" v-model="documentForm.service_type_ids" :value="sv.service_type_id" :disabled="docPickDisabled(sv.service_type_id)" />
+            <span>{{sv.service_name}}</span>
           </label>
-          <!-- Test Area -->
 
           <p v-if="documentForm.brgy_id && !services.length" class="muted">No documents are available for this barangay yet.</p>
           <small class="muted">{{documentForm.service_type_ids.length}} of {{docLimit}} selected · Barangay 1–8 allows 2 documents per request. Barangay 9–14 allows 3 documents per request. Each document gets its own reference number.</small>
@@ -660,27 +695,33 @@
       
       <form class="form-card" @submit.prevent="submitReport">
         <div class="location-picker">
-          <h3>Location</h3>
-          <p class="muted">Choose where the concern or incident happened.</p>
+          <div class="location-head">
+            <div>
+              <h3>Location</h3>
+              <p class="muted">{{ reportLocationLocked ? 'Filled in from your registered barangay.' : 'Choose where the concern or incident happened.' }}</p>
+            </div>
+            <button v-if="reportLocationLocked" type="button" class="small-action" @click="askChangeLocation('report')">Change location</button>
+            <button v-else-if="me && me.brgy_id" type="button" class="text-link" @click="lockReportLocation">Use my barangay</button>
+          </div>
           
           <div class="form-three">
             
             <label>Province
-              <select v-model="reportForm.province_id" @change="reportForm.municipality_id='';reportForm.brgy_id=''" required>
+              <select v-model="reportForm.province_id" :disabled="reportLocationLocked" @change="reportForm.municipality_id='';reportForm.brgy_id=''" required>
                 <option value="" disabled>Select province</option>
                 <option v-for="p in locations" :key="p.province_id" :value="p.province_id">{{p.province_name}}</option>
               </select>
             </label>
 
             <label>Municipality
-              <select v-model="reportForm.municipality_id" @change="reportForm.brgy_id=''" required>
+              <select v-model="reportForm.municipality_id" :disabled="reportLocationLocked" @change="reportForm.brgy_id=''" required>
                 <option value="" disabled>Select municipality</option>
                 <option v-for="m in munis(reportForm)" :key="m.municipality_id" :value="m.municipality_id">{{m.municipality_name}}</option>
               </select>
             </label>
 
             <label>Barangay
-              <select v-model="reportForm.brgy_id" required>
+              <select v-model="reportForm.brgy_id" :disabled="reportLocationLocked" required>
                 <option value="" disabled>Select barangay</option>
                 <option v-for="b in brgys(reportForm)" :key="b.brgy_id" :value="b.brgy_id">{{b.brgy_name}}</option>
               </select>
@@ -1779,11 +1820,13 @@
     
     <div v-if="role==='resident'" class="footer-links">
       <button @click="page='announcements'">Announcements</button>
+      <label class="footer-copy">·</label>
       <button @click="page='manual'">User guide</button>
+      <label class="footer-copy">·</label>
       <button @click="page='services'">Services</button>
     </div>
     
-    <span class="footer-copy">© 2026 kaBRGY · Frontend prototype</span>
+    <span class="footer-copy">© 2026 kaBRGY · Version 2.2.1 · Latest Release  </span>
   
   </footer>
 
@@ -1821,6 +1864,19 @@
       </ul>
       <p>{{maxWarnings - resident.warnings.length}} more warning(s) will deactivate your account. Please follow the barangay rules.</p>
       <button class="btn btn-primary btn-wide" @click="acknowledgeWarnings">I understand</button>
+    </div>
+  </div>
+
+  <div v-if="locationWarn" class="modal-backdrop" @click.self="cancelChangeLocation" role="presentation">
+    <div class="success-modal confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="loc-warn-title" aria-describedby="loc-warn-desc">
+      <div class="success-mark confirm-mark">!</div>
+      <h2 id="loc-warn-title">Change service location?</h2>
+      <p v-if="locationWarnTarget==='report'" id="loc-warn-desc">You're registered in <b>{{settings.name}}</b>. Concerns are normally reported in your own barangay. Only continue if the concern happened in a different one.</p>
+      <p v-else id="loc-warn-desc">You're registered in <b>{{settings.name}}</b>. Documents are normally requested from your own barangay. Only continue if you really need a document from a different one.</p>
+      <div class="confirm-actions">
+        <button type="button" ref="keepLocation" class="btn btn-ghost" @click="cancelChangeLocation">Keep my barangay</button>
+        <button type="button" class="btn btn-primary" @click="confirmChangeLocation">Yes, change it</button>
+      </div>
     </div>
   </div>
 

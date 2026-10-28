@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#12306F" />
+
+  <script>document.documentElement.classList.add("kb-loading");</script>
+  <noscript><style>#kb-loader { display: none !important; }</style></noscript>
+  <link rel="preload" as="image" href="assets/logos/logo-loader.png" fetchpriority="high" />
   <title>kaBRGY | Community Services Portal</title>
   <link rel="icon" href="assets/logos/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -13,6 +17,86 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
+
+<div id="kb-loader" role="status" aria-live="polite">
+  <img class="kb-loader__logo" src="assets/logos/logo-loader.png" alt="kaBRGY" width="567" height="640" decoding="async" fetchpriority="high" onerror="this.onerror=null;this.src='assets/logos/logo.png'" />
+  <div class="kb-loader__caption">
+    <p class="kb-loader__slogan">Your Barangay is one click away</p>
+    <p class="kb-loader__loading">Loading...</p>
+  </div>
+</div>
+<script>
+(function () {
+  // ---- Settings ----------------------------------------------------------------------------
+  var FIRST_VISIT_MIN_MS = 5000;
+  var MAX_WAIT_MS = 10000;
+  var FADE_MS = 450;
+  var SEEN_KEY = "kabrgy-landing-loader-seen";
+  // ------------------------------------------------------------------------------------------
+
+  var root = document.documentElement;
+  var cover = document.getElementById("kb-loader");
+  if (!cover) {
+    root.classList.remove("kb-loading"); 
+    return; 
+  }
+
+  var holds = [];
+  window.kbLoader = { 
+    hold: function (p) { 
+      holds.push(Promise.resolve(p).catch(function () {})); 
+    } 
+  };
+
+  var firstVisit = /[?&]loader=1(&|$)/.test(location.search);
+  try { 
+    if (!sessionStorage.getItem(SEEN_KEY)) firstVisit = true; 
+  } catch (e) {
+
+  }
+
+  var started = Date.now();
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  var pageLoaded = document.readyState === "complete"
+    ? Promise.resolve()
+    : new Promise(function (r) { window.addEventListener("load", r, { once: true }); });
+
+  var settleHolds = function () {
+    var count = holds.length;
+    return Promise.all(holds).then(function () { return holds.length > count ? settleHolds() : null; });
+  };
+
+  var ready = pageLoaded.then(function () {
+    return Promise.all([document.fonts ? document.fonts.ready : null, settleHolds()]);
+  });
+
+  function lift() {
+    try { 
+      sessionStorage.setItem(SEEN_KEY, "1"); 
+    } catch (e) {
+
+    }
+    root.classList.remove("kb-loading");
+    cover.classList.add("is-hiding");
+    setTimeout(function () {
+       cover.remove(); 
+      }, FADE_MS + 60);
+  }
+
+  Promise.race([ready, wait(MAX_WAIT_MS)])
+    .catch(function () {})
+    .then(function () {
+      var left = firstVisit ? FIRST_VISIT_MIN_MS - (Date.now() - started) : 0;
+      return left > 0 ? wait(left) : null;
+    })
+    .then(function () {
+      return new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+    })
+    .then(lift);
+})();
+</script>
+
 <div id="app" v-cloak>
 
   <header class="topbar" ref="header">
@@ -175,7 +259,7 @@
 
     <!-- ABOUT -->
     <section v-show="page==='about'" class="page-col about">
-      <div class="page-hero about-hero">
+      <div class="page-hero">
         <img class="page-hero-logo" src="assets/logos/full_logo.png" alt="" aria-hidden="true" />
         <h2 class="page-hero-title">About kaBRGY</h2>
         <p class="page-hero-lead">kaBRGY is a community-centered website for residents who need faster and more efficient action from their barangay officials. Instead of going to the barangay hall for every transaction, residents can request documents, schedule appointments, report community concerns, and receive announcements and emergency alerts online. It also gives barangay officials and admins one place to verify residents, process requests, and respond to reports.</p>
@@ -229,7 +313,7 @@
         <small>Better-connected communities.</small>
       </div>
     </div>
-    <span class="footer-copy">© 2026 kaBRGY · Frontend prototype</span>
+    <span class="footer-copy">© 2026 kaBRGY · Version 2.2.1 · Latest Release  </span>
   </footer>
 
 </div>

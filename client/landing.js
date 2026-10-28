@@ -5,6 +5,22 @@ const { createApp, nextTick } = Vue;
 const API_URL = location.port === "5173" ? "http://localhost:3000/api" : "/api";
 const COLLAPSED_COUNT = 5;
 
+function preloadHeroImages() {
+  const urls = [...document.querySelectorAll(".hero .slice")]
+    .map((el) => ((el.getAttribute("style") || "").match(/url\(\s*["']?([^"')]+)["']?\s*\)/) || [])[1])
+    .filter(Boolean);
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = img.onerror = resolve;
+          img.src = url;
+        })
+    )
+  );
+}
+
 createApp({
   data() {
     return {
@@ -159,6 +175,12 @@ createApp({
     window.addEventListener("resize", this.updateSpy);
     window.addEventListener("load", this.updateSpy);
     requestAnimationFrame(this.updateSpy);
-    this.loadLocations();
+
+    // Everything starts loading right here, as before. The loading screen only waits for it, never slows it.
+    const locations = this.loadLocations();
+    if (window.kbLoader) {
+      window.kbLoader.hold(locations);
+      window.kbLoader.hold(preloadHeroImages());
+    }
   },
 }).mount("#app");

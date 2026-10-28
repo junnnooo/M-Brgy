@@ -378,7 +378,7 @@ small {
   height: 10px;
   border-radius: 50%;
   background: var(--white);
-  animation: pulse 1.6s ease-out infinite;
+  animation: pulse 1s ease-out infinite;
 }
 @keyframes pulse {
   0% {
@@ -2288,4 +2288,130 @@ tr.row-selected {
 .compact-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* hold-to-reveal password eye */
+.pw-field {
+  position: relative;
+  display: block;
+}
+.auth-form .pw-field input {
+  padding-right: 48px;
+}
+.pw-eye {
+  position: absolute;
+  top: 0; /* the input's 6px top margin collapses outside .pw-field, so the box is exactly the input */
+  bottom: 0; /* stretches to the input's exact height, so the icon is always centered */
+  right: 2px; /* inside the input's 2px border */
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pw-eye:hover,
+.pw-eye.on {
+  color: var(--hall);
+}
+.auth-card.is-admin .pw-eye {
+  color: #9fb3e0;
+}
+.auth-card.is-admin .pw-eye:hover,
+.auth-card.is-admin .pw-eye.on {
+  color: var(--sign);
+}
+/* document picker: checkbox + name on one aligned row */
+.doc-picker {
+  margin: 0 0 22px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.doc-picker legend {
+  padding: 0 6px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.form-card .check-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.form-card .check-option:hover:not(.disabled) {
+  background: var(--paper);
+  border-color: var(--field);
+}
+.form-card .check-option:has(input:checked) {
+  background: #eef3fc;
+  border-color: var(--hall);
+}
+/* beats `.form-card input` (full width, bordered, padded) so the box stays a real checkbox */
+.form-card .check-option input[type="checkbox"] {
+  flex: none;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--hall);
+  cursor: pointer;
+}
+.form-card .check-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.form-card .check-option.disabled input {
+  cursor: not-allowed;
+}
+
+/* document location: locked to the resident's barangay, "Change location" asks first */
+.location-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+.location-head p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.location-head .small-action,
+.location-head .text-link {
+  flex: none;
+}
+.form-card select:disabled {
+  background: #e9eef8;
+  border-color: var(--line);
+  color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
+  opacity: 1;
+  cursor: not-allowed;
+}
+.confirm-mark {
+  background: var(--sign);
+  color: var(--ink);
+  font: 800 1.5rem var(--display);
+}
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
 }

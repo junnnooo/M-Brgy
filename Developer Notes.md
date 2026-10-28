@@ -6,6 +6,17 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 2.2.1 (OPTIMIZATION UPDATE PART 2 + MINOR UPDATE)
+
+    (+) Added a Loading screen to make sure that the website is fully loaded
+    (+) Added Page Automatically Updating
+    (+) Added two new Notif sounds, Both regular and emergency notifs
+
+    (~) Fixed Minor bug where in the /app, the icon for the website is not loaded/showing
+    (~) Adjusted waiting time for the Page to update, From 1min -> 10sec
+    (~) Fixed the Stupid Check box not aligned in Request Form
+    (~) Changes on Request Form and Report a Consern in Residents Side, The changing of locations has a warning now
+
 ## Version: 2.2.0 (OPTIMIZATION UPDATE PART 1 + MINOR UPDATE)
 
     (+) Added/Applied proper AJAX formating to make the server feel more responsive and fast

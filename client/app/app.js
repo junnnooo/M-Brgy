@@ -32,6 +32,49 @@ const saveDismissed = (map) => {
   }
 };
 
+// Notification sounds (paths are relative to client/app/index.html)
+const SOUNDS = {
+  regular: new Audio("../assets/sound/Notif_Sound.wav"),
+  emergency: new Audio("../assets/sound/Emergency_Notif_Sound.wav"),
+};
+Object.values(SOUNDS).forEach((a) => (a.preload = "auto"));
+
+// Several sources (bell, announcements, alerts) can report something new in the same poll.
+// Requests are gathered for a moment and ONE sound plays (emergency wins), so nothing overlaps or restarts.
+let pendingSound = null;
+let soundTimer = null;
+const playSound = (kind) => {
+  if (kind === "emergency" || !pendingSound) pendingSound = kind;
+  if (soundTimer) return;
+  soundTimer = setTimeout(() => {
+    const a = SOUNDS[pendingSound];
+    pendingSound = soundTimer = null;
+    if (!a.paused && !a.ended) return; // already playing: never restart it
+    Object.values(SOUNDS).forEach((x) => { if (x !== a) x.pause(); });
+    a.currentTime = 0;
+    a.play().catch(() => {
+      /* blocked until the user has clicked/tapped the page once */
+    });
+  }, 600);
+};
+
+// Browsers only allow sound after a user gesture. On the first click/key/tap,
+// "prime" both sounds silently so later polled notifications can play.
+const unlockSounds = () => {
+  Object.values(SOUNDS).forEach((a) => {
+    a.muted = true;
+    a.play()
+      .then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+      })
+      .catch(() => (a.muted = false));
+  });
+  ["pointerdown", "keydown"].forEach((ev) => document.removeEventListener(ev, unlockSounds));
+};
+["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, unlockSounds));
+
 const TIME_SLOTS = [
   { value: "08:00", label: "8:00 AM" },
   { value: "09:00", label: "9:00 AM" },
@@ -108,12 +151,16 @@ createApp({
       reports: [],
       profiles: [],
       notifications: [],
+      knownNotifIds: null, // ids already seen, used to play a sound only for new notifications
+      knownPostIds: null,
+      knownAlertIds: null,
       archivedPosts: [], // staff only: archived announcements (hidden from residents)
       archivedAlerts: [], // staff only: archived emergency alerts
 
       authView: "resident",
       authMode: "login",
       authError: "",
+      showPw: { login: false, signup: false, confirm: false, admin: false },
       loginForm: { email: "", password: "" },
       signupForm: blankSignup(),
       adminForm: { email: "", password: "" },
@@ -162,6 +209,12 @@ createApp({
       accountError: "",
       appealText: "",
       warningAck: false,
+
+      // Document form location: locked to the resident's own barangay until they confirm a change
+      docLocationUnlocked: false,
+      reportLocationUnlocked: false,
+      locationWarn: false,
+      locationWarnTarget: "doc", // which form the warning is about: "doc" or "report"
 
       notifOpen: false,
       menuOpen: false, // the avatar dropdown (Profile / Track Status / Log out)
@@ -223,15 +276,11 @@ createApp({
     recentAdminAnnouncements() {
       return this.announcements.slice(0, 5);
     },
+    // Sticky: an alert stays on screen for as long as the server still lists it. It never times out
+    // on its own. It goes away when the resident dismisses it (X) or when it is archived/deleted,
+    // which the 10-second refresh notices. If a refresh fails, the current banner simply stays.
     activeAlert() {
-      const now = Date.now();
-      return (
-        this.alerts.find(
-          (a) =>
-            new Date(a.starts_at).getTime() <= now &&
-            (!a.expires_at || new Date(a.expires_at).getTime() > now),
-        ) || null
-      );
+      return [...this.alerts].sort((x, y) => String(y.starts_at).localeCompare(String(x.starts_at)))[0] || null;
     },
     emergencyDismissed() {
       return Boolean(
@@ -273,6 +322,14 @@ createApp({
     docLimit() {
       const b = this.brgys(this.documentForm).find((x) => x.brgy_id === this.documentForm.brgy_id);
       return b ? docLimitFor(b.brgy_name) : 0;
+    },
+    // The location pickers are read-only while they show the resident's registered barangay.
+    // If we cannot work out that barangay, nothing is locked so the form stays usable.
+    docLocationLocked() {
+      return Boolean(this.me?.brgy_id && this.findLocation(this.me.brgy_id)) && !this.docLocationUnlocked;
+    },
+    reportLocationLocked() {
+      return Boolean(this.me?.brgy_id && this.findLocation(this.me.brgy_id)) && !this.reportLocationUnlocked;
     },
     residentRequests() {
       return this.requests;
@@ -406,6 +463,21 @@ createApp({
     reportFilter() { this.reportSelected = []; },
     reportSearch() { this.reportSelected = []; },
     adminPage() { this.docSelected = []; this.reportSelected = []; },
+    notifications(list) {
+      // Only residents get the bell. Logged out: forget everything so the next login starts fresh.
+      if (this.role !== "resident") {
+        this.knownNotifIds = null;
+        return;
+      }
+      const ids = new Set(list.map((n) => String(n.id)));
+      if (this.knownNotifIds) {
+        const fresh = list.filter((n) => !n.read && !this.knownNotifIds.has(String(n.id)));
+        if (fresh.length) playSound(fresh.some((n) => n.kind === "alert") ? "emergency" : "regular");
+      }
+      this.knownNotifIds = ids; // first run after login just records what's already there
+    },
+    posts(list) { this.boardSound(list, "knownPostIds", "regular"); },
+    alerts(list) { this.boardSound(list, "knownAlertIds", "emergency"); },
   },
   methods: {
     // The Session: On boot, check if the user is logged in and load their session data,
@@ -468,6 +540,13 @@ createApp({
         const me = await api.get("/auth/me");
         Object.assign(this.resident, this.standingOf(me));
         this.me = { ...this.me, ...this.standingOf(me) };
+        if (me.barangay) {
+          this.settings = {
+            name: me.barangay.brgy_name,
+            address: me.barangay.address || "",
+            hours: me.barangay.office_hours || "",
+          };
+        }
         if (!me.deactivated && me.warnings.some((w) => !w.seen)) this.warningAck = true;
       } catch (e) {
         /* the next poll will try again */
@@ -496,13 +575,63 @@ createApp({
       if (!this.me || document.visibilityState === "hidden") return;
       try {
         if (this.role === "resident") {
-          await Promise.all([this.loadNotifications(), this.refreshStanding()]);
+          await Promise.all([this.loadNotifications(), this.refreshStanding(), this.refreshBoard()]);
         } else {
           await this.refreshStaffData();
         }
       } catch (e) {
         /* the next poll will try again */
       }
+    },
+    // Emergency banner: slides down from under the header, and back up behind it.
+    // Driven from JS (Web Animations), so it does not depend on any CSS file.
+    bannerEnter(el, done) { this.slideBanner(el, true, done); },
+    bannerLeave(el, done) { this.slideBanner(el, false, done); },
+    slideBanner(el, show, done) {
+      const inner = el.firstElementChild;
+      if (!inner || !el.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+      const h = `${el.scrollHeight}px`;
+      const opts = {
+        duration: show ? 500 : 150,
+        easing: show ? "cubic-bezier(0.22, 1, 0.36, 1)" : "cubic-bezier(0.55, 0, 0.8, 0.3)",
+        fill: "both",
+      };
+      el.style.overflow = "hidden";
+      el.animate({ height: show ? ["0px", h] : [h, "0px"] }, opts);
+      inner
+        .animate({ transform: show ? ["translateY(-100%)", "translateY(0)"] : ["translateY(0)", "translateY(-100%)"] }, opts)
+        .finished.then(() => {
+          el.style.overflow = "";
+          done();
+        })
+        .catch(done);
+    },
+    // Residents: quietly re-fetch announcements and emergency alerts so new ones appear without a reload
+    async refreshBoard() {
+      if (this.role !== "resident") return;
+      const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
+      try {
+        const [posts, alerts, requests, reports] = await Promise.all([
+          api.get(`/announcements${q}`),
+          api.get(`/alerts${q}`),
+          api.get("/requests/mine"),
+          api.get("/reports/mine"),
+        ]);
+        Object.assign(this, { posts, alerts, requests, reports });
+        await this.refreshTracked();
+      } catch (e) {
+        /* the next poll will try again */
+      }
+    },
+    // Play a sound when a list gains an id we haven't seen. The first load after login only records ids.
+    boardSound(list, key, kind) {
+      if (this.role !== "resident") {
+        this[key] = null;
+        return;
+      }
+      const ids = new Set(list.map((x) => String(x.id)));
+      if (this[key] && list.some((x) => !this[key].has(String(x.id)))) playSound(kind);
+      this[key] = ids;
     },
     // Staff: reload the tables quietly (no error toasts) so new requests and reports show up on their own
     async refreshStaffData() {
@@ -613,6 +742,25 @@ createApp({
       }
     },
 
+    // Hold-to-reveal for password fields: shows while pressed, hides on release / leave / blur
+    pwEvents(key) {
+      const set = (on) => { this.showPw[key] = on; };
+      return {
+        pointerdown: (e) => { e.preventDefault(); set(true); }, // preventDefault keeps focus in the input
+        pointerup: () => set(false),
+        pointerleave: () => set(false),
+        pointercancel: () => set(false),
+        blur: () => set(false),
+        contextmenu: (e) => e.preventDefault(), // stops the long-press menu on phones
+        keydown: (e) => {
+          if (e.key === " " || e.key === "Enter") { e.preventDefault(); set(true); }
+        },
+        keyup: (e) => {
+          if (e.key === " " || e.key === "Enter") set(false);
+        },
+      };
+    },
+
     setAuthView(v) {
       this.authView = v;
       this.authError = "";
@@ -696,6 +844,9 @@ createApp({
         archivedPosts: [], archivedAlerts: [],
       });
       this.documentForm = blankDocumentForm();
+      this.docLocationUnlocked = false;
+      this.reportLocationUnlocked = false;
+      this.locationWarn = false;
       this.reportForm = blankReportForm();
       this.trackId = "";
       this.trackSearched = false;
@@ -730,8 +881,36 @@ createApp({
     },
 
     // Residents Document:
+    // Putting the location back to the resident's own barangay and locking it again.
+    // Used every time the page opens, and by "Use my barangay".
+    async lockDocLocation() {
+      this.docLocationUnlocked = false;
+      this.locationWarn = false;
+      const home = this.findLocation(this.me?.brgy_id);
+      if (!home || !this.documentForm.brgy_id || this.documentForm.brgy_id === home.brgy_id) return;
+      // documents differ per barangay, so a selection from another barangay cannot stay
+      Object.assign(this.documentForm, home, { service_type_ids: [] });
+      await this.loadServices(home.brgy_id);
+    },
+    // Changing the location is deliberate: a warning first, then the pickers unlock
+    askChangeLocation(target = "doc") {
+      this.locationWarnTarget = target;
+      this.locationWarn = true;
+      this.$nextTick(() => {
+        if (this.$refs.keepLocation) this.$refs.keepLocation.focus();
+      });
+    },
+    confirmChangeLocation() {
+      this.locationWarn = false;
+      if (this.locationWarnTarget === "report") this.reportLocationUnlocked = true;
+      else this.docLocationUnlocked = true;
+    },
+    cancelChangeLocation() {
+      this.locationWarn = false;
+    },
     async openDocument() {
       this.page = "documents";
+      await this.lockDocLocation();
       this.prepareForm(this.documentForm);
       if (this.documentForm.brgy_id && !this.services.length) {
         await this.loadServices(this.documentForm.brgy_id);
@@ -790,6 +969,7 @@ createApp({
         this.trackId = refs[0];
         this.modal = "success";
         this.documentForm = blankDocumentForm();
+        this.docLocationUnlocked = false;
         this.prepareForm(this.documentForm);
         await this.loadServices(this.documentForm.brgy_id);
       } catch (e) {
@@ -798,8 +978,18 @@ createApp({
     },
 
     // Residents Reports:
+    // Same idea as the document form: back to the resident's own barangay, locked
+    lockReportLocation() {
+      this.reportLocationUnlocked = false;
+      this.locationWarn = false;
+      const home = this.findLocation(this.me?.brgy_id);
+      if (home && this.reportForm.brgy_id && this.reportForm.brgy_id !== home.brgy_id) {
+        Object.assign(this.reportForm, home);
+      }
+    },
     openReport() {
       this.page = "report";
+      this.lockReportLocation();
       this.prepareForm(this.reportForm);
     },
     async submitReport() {
@@ -827,6 +1017,7 @@ createApp({
         this.trackId = r.ref;
         this.modal = "success";
         this.reportForm = blankReportForm();
+        this.reportLocationUnlocked = false;
         this.prepareForm(this.reportForm);
       } catch (e) {
         this.notify(e.message);
@@ -851,6 +1042,20 @@ createApp({
         if (e.status !== 404 && seq === this.trackSeq) this.notify(e.message);
       } finally {
         if (seq === this.trackSeq) this.trackLoading = false;
+      }
+    },
+
+    async refreshTracked() {
+      if (!this.trackedItem || this.trackLoading) return;
+      const ref = parseRef(this.trackId);
+      if (!ref) return;
+      const seq = this.trackSeq;
+      try {
+        const { kind } = this.trackedItem;
+        const data = await api.get(`${kind === "report" ? "/reports" : "/requests"}/${ref.canonical}`);
+        if (seq === this.trackSeq && this.trackedItem) this.trackedItem = { kind, data };
+      } catch (e) {
+        /* the next poll will try again */
       }
     },
 
@@ -1289,7 +1494,8 @@ createApp({
         return;
       }
       this.notifOpen = false;
-      if (this.accountDialog) this.closeAccountDialog();
+      if (this.locationWarn) this.cancelChangeLocation();
+      else if (this.accountDialog) this.closeAccountDialog();
       else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
@@ -1303,7 +1509,7 @@ createApp({
     }
     // Poll every minute (residents: notifications + account standing, staff: the tables).
     // Skipped while the tab is hidden, and refreshed right away when the user comes back.
-    setInterval(() => this.refreshLive(), 60000);
+    setInterval(() => this.refreshLive(), 10000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") this.refreshLive();
     });
