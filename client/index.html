@@ -10,11 +10,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="landing.css" />
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
+<div id="app" v-cloak>
 
-  <header class="topbar">
-    <a class="brand" href="#home">
+  <header class="topbar" ref="header">
+    <a class="brand" href="#" @click.prevent="go('home')">
       <img class="brand-logo" src="assets/logos/graphic.png" alt="kaBRGY logo" />
       <span>
         <b>kaBRGY</b>
@@ -23,76 +25,199 @@
     </a>
 
     <nav class="top-nav" aria-label="Main">
-      <a href="#home" data-nav="home">Home</a>
-      <a href="#barangay" data-nav="barangay">Barangay</a>
-      <a href="#contact" data-nav="contact">Contact Us</a>
-      <a href="#about" data-nav="about">About</a>
+      <button type="button" :class="{active: activeTab==='home'}" :aria-current="activeTab==='home' ? 'true' : null" @click="go('home')">Home</button>
+      <button type="button" :class="{active: activeTab==='barangay'}" :aria-current="activeTab==='barangay' ? 'true' : null" @click="go('barangay')">Barangay</button>
+      <button type="button" :class="{active: activeTab==='contact'}" :aria-current="activeTab==='contact' ? 'true' : null" @click="go('contact')">Contact Us</button>
+      <button type="button" :class="{active: activeTab==='about'}" :aria-current="activeTab==='about' ? 'true' : null" @click="go('about')">About</button>
     </nav>
-
   </header>
 
   <main>
 
-    <!-- HOME -->
-    <section id="home" class="hero">
-      <div class="hero-inner">
-        <div class="hero-copy">
-          <h1>Get barangay business done from home.</h1>
-          <p class="hero-lead">Request a document, pick a pickup time, report a problem on your street, and read what the hall is announcing.</p>
-          <hr class="hero-rule" />
-          <p class="hero-cta">Get Started Today!</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="app/">Log In</a>
-            <a class="btn btn-outline" href="app/?mode=signup">Sign Up</a>
+    <!-- HOME + BARANGAY (one scrolling page) -->
+    <div v-show="page==='home'">
+
+      <section id="home" class="hero">
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <h1>Get barangay business done from home.</h1>
+            <p class="hero-lead">Request a document, pick a pickup time, report a problem on your street, and read what the hall is announcing.</p>
+            <hr class="hero-rule" />
+            <p class="hero-cta">Get Started Today!</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="app/">Log In</a>
+              <a class="btn btn-outline" href="app/?mode=signup">Sign Up</a>
+            </div>
+          </div>
+
+          <!-- Hero photos live in assets/image/ (image_1.jpg, image_2.jpg, image_3.jpg) -->
+          <div class="hero-slices" aria-hidden="true">
+            <div class="slice" style="--img:url(assets/image/image_1.jpg)"></div>
+            <div class="slice" style="--img:url(assets/image/image_2.jpg)"></div>
+            <div class="slice" style="--img:url(assets/image/image_3.jpg)"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="barangay" class="page-col">
+        <div class="finder">
+          <h2 class="page-title">Barangay</h2>
+          <p class="finder-hint">Please select your province and municipality</p>
+
+          <div class="finder-fields">
+            <select aria-label="Province" v-model="provinceId" @change="onProvinceChange" :disabled="!locations.length">
+              <option value="">Enter your province</option>
+              <option v-for="p in locations" :key="p.province_id" :value="p.province_id">{{p.province_name}}</option>
+            </select>
+            <select aria-label="Municipality" v-model="municipalityId" @change="expanded=false" :disabled="!municipalities.length">
+              <option value="">Enter your municipality</option>
+              <option v-for="m in municipalities" :key="m.municipality_id" :value="m.municipality_id">{{m.municipality_name}}</option>
+            </select>
+          </div>
+
+          <p class="finder-status" role="status">{{statusText}}</p>
+
+          <div v-if="!municipality && !loadFailed" class="finder-empty">
+            <p>Select a province and municipality to see all available barangays.</p>
+          </div>
+
+          <div v-if="barangays.length" class="finder-results">
+            <ul class="brgy-list">
+              <li v-for="b in visibleBarangays" :key="b.brgy_id">
+                <button type="button" class="brgy-btn">{{b.brgy_name}}</button>
+              </li>
+            </ul>
+            <button v-if="barangays.length > collapsedCount" type="button" class="see-toggle" :aria-expanded="expanded" @click="expanded = !expanded">
+              {{expanded ? 'See Less' : 'See All'}} <span aria-hidden="true">{{expanded ? '⌃' : '⌄'}}</span>
+            </button>
           </div>
         </div>
 
-        <!-- Hero photos live in assets/image/ (image_1.jpg, image_2.jpg, image_3.jpg) -->
-        <div class="hero-slices" aria-hidden="true">
-          <div class="slice" style="--img:url(assets/image/image_1.jpg)"></div>
-          <div class="slice" style="--img:url(assets/image/image_2.jpg)"></div>
-          <div class="slice" style="--img:url(assets/image/image_3.jpg)"></div>
+        <div class="card-row">
+          <aside class="guide-card">
+            <p class="guide-eyebrow">Interested?</p>
+            <h2>Wanna be a part of our journey? Start your own barangay's presence online.</h2>
+            <p>Bring your barangay's services online. Give your residents one simple place to request documents, report concerns, and read your announcements, and join the barangays already growing with kaBRGY.</p>
+            <button type="button" class="btn btn-primary btn-sm" @click="go('contact')">Join Now →</button>
+          </aside>
+
+          <aside class="guide-card">
+            <p class="guide-eyebrow">Who are we?</p>
+            <h2>Curious who's behind kaBRGY? Get to know our story.</h2>
+            <p>kaBRGY is a community services portal that brings the barangay hall closer to every resident. Learn what we're building, why it matters, and how we hope to make barangay services easier for everyone.</p>
+            <button type="button" class="btn btn-primary btn-sm" @click="go('about')">Learn More About Us →</button>
+          </aside>
         </div>
+      </section>
+
+    </div>
+
+    <!-- CONTACT US -->
+    <section v-show="page==='contact'" class="page-col contact">
+      <div class="page-hero">
+        <img class="page-hero-logo" src="assets/logos/full_logo.png" alt="" aria-hidden="true" />
+        <h2 class="page-hero-title">Contact Us</h2>
+        <p class="page-hero-lead">Any question? Reach out to us and we'll get back to you shortly.</p>
+
+        <ul class="contact-methods">
+          <li>
+            <a class="contact-method" href="tel:09688526355">
+              <span class="contact-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </span>
+              <span class="contact-text">
+                <small>Call us</small>
+                <b>0968-852-6355</b>
+              </span>
+            </a>
+          </li>
+          <li>
+            <a class="contact-method" href="mailto:email@gmail.com">
+              <span class="contact-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+              </span>
+              <span class="contact-text">
+                <small>Email us</small>
+                <b>email@gmail.com</b>
+              </span>
+            </a>
+          </li>
+        </ul>
       </div>
+
+      <form class="contact-form" novalidate @submit.prevent="sendMessage">
+        <h2>Send us a message</h2>
+        <p class="contact-form-hint">Fill in the three boxes below, then press the yellow button.</p>
+
+        <div class="field">
+          <label for="contact-name">Your name <span class="req">(required)</span></label>
+          <input id="contact-name" ref="name" v-model="form.name" type="text" autocomplete="name" :aria-invalid="errors.name ? 'true' : null" aria-describedby="contact-name-error" @input="errors.name = ''" />
+          <p v-if="errors.name" id="contact-name-error" class="field-error">{{errors.name}}</p>
+        </div>
+
+        <div class="field">
+          <label for="contact-email">Your email <span class="req">(required)</span></label>
+          <input id="contact-email" ref="email" v-model="form.email" type="email" autocomplete="email" inputmode="email" :aria-invalid="errors.email ? 'true' : null" aria-describedby="contact-email-hint contact-email-error" @input="errors.email = ''" />
+          <p id="contact-email-hint" class="field-hint">We will send our reply to this email address.</p>
+          <p v-if="errors.email" id="contact-email-error" class="field-error">{{errors.email}}</p>
+        </div>
+
+        <div class="field">
+          <label for="contact-message">Your message <span class="req">(required)</span></label>
+          <textarea id="contact-message" ref="message" v-model="form.message" rows="6" :aria-invalid="errors.message ? 'true' : null" aria-describedby="contact-message-error" @input="errors.message = ''"></textarea>
+          <p v-if="errors.message" id="contact-message-error" class="field-error">{{errors.message}}</p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" :disabled="sending">{{sending ? 'Sending…' : 'Send message'}}</button>
+        <p v-if="result" ref="result" :class="['contact-result', 'is-' + result.kind]" role="status">{{result.text}}</p>
+      </form>
     </section>
 
-    <!-- BARANGAY -->
-    <section id="barangay" class="page-col">
-      <div class="finder">
-        <h2 class="page-title">Barangay</h2>
-        <p class="finder-hint">Please select your province and municipality</p>
-        <div class="finder-fields">
-          <select id="province" aria-label="Province" disabled><option value="">Enter your province</option></select>
-          <select id="municipality" aria-label="Municipality" disabled><option value="">Enter your municipality</option></select>
-        </div>
-        <p id="finder-status" class="finder-status" role="status">Loading locations…</p>
-        <div id="finder-empty" class="finder-empty">
-          <p>Select a province and municipality to see all available barangays.</p>
-        </div>
-        <div id="finder-results" class="finder-results" hidden>
-          <ul id="brgy-list" class="brgy-list"></ul>
-          <button type="button" id="brgy-toggle" class="see-toggle" hidden>See All <span aria-hidden="true">⌄</span></button>
-        </div>
+    <!-- ABOUT -->
+    <section v-show="page==='about'" class="page-col about">
+      <div class="page-hero about-hero">
+        <img class="page-hero-logo" src="assets/logos/full_logo.png" alt="" aria-hidden="true" />
+        <h2 class="page-hero-title">About kaBRGY</h2>
+        <p class="page-hero-lead">kaBRGY is a community-centered website for residents who need faster and more efficient action from their barangay officials. Instead of going to the barangay hall for every transaction, residents can request documents, schedule appointments, report community concerns, and receive announcements and emergency alerts online. It also gives barangay officials and admins one place to verify residents, process requests, and respond to reports.</p>
       </div>
 
-      <div class="card-row">
-        <aside class="guide-card">
-          <p class="guide-eyebrow">Interested?</p>
-          <h2>Wanna be a part of our journey? Start your own barangay's presence online.</h2>
-          <p>Bring your barangay's services online. Give your residents one simple place to request documents, report concerns, and read your announcements, and join the barangays already growing with kaBRGY.</p>
-          <a class="btn btn-primary btn-sm" href="#contact">Join Now →</a>
-        </aside>
-
-        <aside class="guide-card">
-          <p class="guide-eyebrow">Who are we?</p>
-          <h2>Curious who's behind kaBRGY? Get to know our story.</h2>
-          <p>kaBRGY is a community services portal that brings the barangay hall closer to every resident. Learn what we're building, why it matters, and how we hope to make barangay services easier for everyone.</p>
-          <a class="btn btn-primary btn-sm" href="#about">Learn More About Us →</a>
-        </aside>
+      <div class="why">
+        <h2 class="why-title">Why choose kaBRGY</h2>
+        <p class="why-lead">A safe, secure, and user-oriented platform for all barangay transactions, promoting transparency and accountability.</p>
+        <ul class="feature-grid">
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.2 7.5 10 4.4-1.8 7.5-5.4 7.5-10v-6L12 2.5z"/><path d="m8.8 12 2.4 2.4 4-4.4"/></svg></span>
+            <h3>Secure &amp; Private</h3>
+            <p>Protects residents' personal information and account details.</p>
+          </li>
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
+            <h3>24/7 Accessibility</h3>
+            <p>Allows residents to access online services anytime.</p>
+          </li>
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+            <h3>Transparency</h3>
+            <p>Keeps residents informed about announcements and the status of their requests.</p>
+          </li>
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.5 0 4.5 1.7 4.5 4.5"/></svg></span>
+            <h3>User-Oriented</h3>
+            <p>Prioritizes residents' needs through a simple and convenient interface.</p>
+          </li>
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>
+            <h3>Efficiency</h3>
+            <p>Reduces unnecessary visits, waiting times, and paperwork.</p>
+          </li>
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.7 2.7 5.5-5.5"/></svg></span>
+            <h3>Reliability</h3>
+            <p>Provides consistent services and dependable information.</p>
+          </li>
+        </ul>
       </div>
     </section>
-
-    <!-- Contact Us (#contact) and About (#about) sections come in the next step -->
 
   </main>
 
@@ -107,6 +232,7 @@
     <span class="footer-copy">© 2026 kaBRGY · Frontend prototype</span>
   </footer>
 
-  <script src="landing.js"></script>
+</div>
+<script src="landing.js"></script>
 </body>
 </html>

@@ -1,11 +1,9 @@
 import { supabase } from "../utils/supabase.js";
 import { check, toDay } from "../utils/helpers.js";
 
-// Account moderation + per-resident limits (ported from the beta).
-export const MAX_WARNINGS = 3; // the 3rd active warning deactivates the account
-export const MAX_ACTIVE = 3; // active document requests / concern reports per resident
+export const MAX_WARNINGS = 3;
+export const MAX_ACTIVE = 3;
 
-// Only in-progress items count; a final status frees a slot.
 export const LIVE_REQUEST_STATUSES = ["Pending", "Approved", "Ready for Pickup"];
 export const LIVE_REPORT_STATUSES = ["Submitted", "Received", "In Progress"];
 
@@ -16,7 +14,6 @@ export function docLimitFor(brgyName) {
   return n >= 1 && n <= 8 ? 2 : 3;
 }
 
-// A deactivated resident can still log in (to read the reason and appeal) but can't use the services.
 export const isDeactivated = (account) => Boolean(account?.deactivated_at);
 
 const toWarning = (w) => ({
@@ -34,36 +31,55 @@ const toAppeal = (a) => ({
   response: a.response ?? "",
 });
 
-// { [accountId]: { warnings: [...active warnings], appeal: latest appeal of the current deactivation | null } }
+const CHUNK = 100;
+const chunks = (list, size = CHUNK) =>
+  Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size));
+
+// Better Loading: Runs one query per chunk, all at the same time, and joins the rows (each account is in exactly one chunk,
+//                 so the order of its own rows is kept).
+const inParts = async (ids, run) => (await Promise.all(chunks(ids).map(run))).flatMap((result) => check(result));
+
 export async function standingOf(accounts) {
   const list = accounts.filter(Boolean);
   const out = Object.fromEntries(list.map((a) => [a.account_id, { warnings: [], appeal: null }]));
   if (!list.length) return out;
-  const ids = list.map((a) => a.account_id);
 
-  const warnings = check(
-    await supabase
-      .from("account_warnings")
-      .select("*")
-      .in("account_id", ids)
-      .is("cleared_at", null)
-      .order("issued_at")
-      .order("warning_id"),
-  );
+  // Appeal Panel: An appeal is only ever shown for a deactivated account, and only if it was sent after the deactivation.
+  //               So only those accounts are asked about, and appeals older than the earliest deactivation are never downloaded.
+  const deactivated = list.filter((a) => a.deactivated_at);
+  const since = Object.fromEntries(deactivated.map((a) => [a.account_id, a.deactivated_at]));
+  const earliest = deactivated.length
+    ? new Date(Math.min(...deactivated.map((a) => new Date(a.deactivated_at).getTime()))).toISOString()
+    : null;
+
+  const [warnings, appeals] = await Promise.all([
+    inParts(
+      list.map((a) => a.account_id),
+      (ids) =>
+        supabase
+          .from("account_warnings")
+          .select("warning_id, account_id, reason, issued_at, seen_at")
+          .in("account_id", ids)
+          .is("cleared_at", null)
+          .order("issued_at")
+          .order("warning_id"),
+    ),
+    inParts(
+      deactivated.map((a) => a.account_id),
+      (ids) =>
+        supabase
+          .from("account_appeals")
+          .select("appeal_id, account_id, message, submitted_at, status, response")
+          .in("account_id", ids)
+          .gte("submitted_at", earliest)
+          .order("submitted_at", { ascending: false })
+          .order("appeal_id", { ascending: false }),
+    ),
+  ]);
+
   for (const w of warnings) out[w.account_id].warnings.push(toWarning(w));
-
-  const appeals = check(
-    await supabase
-      .from("account_appeals")
-      .select("*")
-      .in("account_id", ids)
-      .order("submitted_at", { ascending: false })
-      .order("appeal_id", { ascending: false }),
-  );
-  const since = Object.fromEntries(list.map((a) => [a.account_id, a.deactivated_at]));
   for (const ap of appeals) {
     const slot = out[ap.account_id];
-    // newest first: keep the first one, and only if it belongs to the current deactivation
     if (slot.appeal || !since[ap.account_id]) continue;
     if (new Date(ap.submitted_at) < new Date(since[ap.account_id])) continue;
     slot.appeal = toAppeal(ap);
@@ -71,7 +87,6 @@ export async function standingOf(accounts) {
   return out;
 }
 
-// The fields the client needs to render an account's standing
 export const standingFields = (account, standing) => ({
   deactivated: isDeactivated(account),
   deactivation_reason: account.deactivation_reason ?? "",

@@ -1293,8 +1293,6 @@ createApp({
       else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();
     });
-    // Keep --header-h equal to the real header height (it changes on phones, where the nav wraps),
-    // so the sticky gold line under the hero always sits flush against the bottom of the header.
     const bar = document.querySelector(".topbar");
     if (bar) {
       const setHeaderHeight = () =>

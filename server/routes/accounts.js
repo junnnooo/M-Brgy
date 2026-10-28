@@ -3,12 +3,15 @@ import { supabase } from "../utils/supabase.js";
 import {
   canTouchBarangay, check, fullName, httpError, PENDING, VERIFIED, scopeToBarangay,
 } from "../utils/helpers.js";
-import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { invalidateAccount, requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 import { MAX_WARNINGS, standingFields, standingOf } from "./moderation.js";
 
 const router = Router();
 const RESIDENT_ROLE_ID = 1;
+// The staff list only shows these; everything else on the row is not downloaded.
+const LIST_COLUMNS =
+  "account_id, first_name, middle_name, last_name, email, address, contact_number, verification_status, deactivated_at, deactivation_reason";
 
 const toProfile = (a, standing) => ({
   id: a.account_id,
@@ -43,7 +46,7 @@ function cleanReason(value, min = 5) {
 }
 
 async function deactivate(account, reason) {
-  return check(
+  const updated = check(
     await supabase
       .from("accounts")
       .update({ deactivated_at: new Date().toISOString(), deactivation_reason: reason })
@@ -51,12 +54,14 @@ async function deactivate(account, reason) {
       .select()
       .single(),
   );
+  invalidateAccount(account.account_id); // the resident is blocked on their very next request
+  return updated;
 }
 
 // Staff: resident accounts in their barangay
 router.get("/", requireAuth, requireStaff, async (req, res) => {
   const query = scopeToBarangay(
-    supabase.from("accounts").select("*").eq("role_id", RESIDENT_ROLE_ID).order("created_at", { ascending: false }),
+    supabase.from("accounts").select(LIST_COLUMNS).eq("role_id", RESIDENT_ROLE_ID).order("created_at", { ascending: false }),
     req.account,
   );
   const rows = check(await query);
@@ -123,6 +128,9 @@ router.patch("/:id/verification", requireAuth, requireStaff, async (req, res) =>
       .select()
       .single(),
   );
+  
+// New verification status: applies on their next request
+  invalidateAccount(existing.account_id); 
 
   if ((existing.verification_status === VERIFIED) !== verified) {
     await notifyAccount(
@@ -189,6 +197,7 @@ router.post("/:id/reactivate", requireAuth, requireStaff, async (req, res) => {
       .select()
       .single(),
   );
+  invalidateAccount(account.account_id); // Reactivated: lifts the block on their next request
   check(
     await supabase
       .from("account_warnings")

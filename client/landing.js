@@ -1,149 +1,164 @@
-// Landing page: one scrolling page. The top tabs light up as each section scrolls into view,
-// and the province → municipality → barangay picker fills from the API.
+// Landing page: one site, no URL changes. Home (+ Barangay), Contact Us and About are shown and hidden
+//               with `page`, the same idea as the portal's app.js. Vue comes from the CDN tag in index.html.
+const { createApp, nextTick } = Vue;
+
 const API_URL = location.port === "5173" ? "http://localhost:3000/api" : "/api";
 const COLLAPSED_COUNT = 5;
 
-const $ = (id) => document.getElementById(id);
-const provinceEl = $("province");
-const municipalityEl = $("municipality");
-const statusEl = $("finder-status");
-const resultsEl = $("finder-results");
-const emptyEl = $("finder-empty");
-const listEl = $("brgy-list");
-const toggleEl = $("brgy-toggle");
+createApp({
+  data() {
+    return {
+      page: "home",
+      spy: "home",
+      collapsedCount: COLLAPSED_COUNT,
 
-let locations = [];
-let expanded = false;
-let loadFailed = false;
+      // Barangay picker
+      locations: [],
+      loadingLocations: true,
+      loadFailed: false,
+      provinceId: "",
+      municipalityId: "",
+      expanded: false,
 
-/* ---------- Tabs follow the scroll ---------- */
-const header = document.querySelector(".topbar");
-const tabs = [...document.querySelectorAll("[data-nav]")];
-const sections = tabs.map((a) => document.getElementById(a.dataset.nav)).filter(Boolean);
+      // Contact form
+      form: { name: "", email: "", message: "" },
+      errors: { name: "", email: "", message: "" },
+      sending: false,
+      result: null,
+    };
+  },
 
-function updateActiveTab() {
-  // A section becomes current once its top reaches this line, just under the header,
-  // so the tab switches when the blue hero has scrolled out of view
-  const line = header.offsetHeight + 80;
-  let current = sections[0];
-  for (const s of sections) if (s.getBoundingClientRect().top <= line) current = s;
-  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
-    current = sections[sections.length - 1];
-  }
-  tabs.forEach((a) => {
-    const on = current && a.dataset.nav === current.id;
-    a.classList.toggle("active", on);
-    if (on) a.setAttribute("aria-current", "true");
-    else a.removeAttribute("aria-current");
-  });
-}
+  computed: {
+    // The Highlighted Tab: follows the scroll on Home, otherwise the page itself
+    activeTab() {
+      return this.page === "home" ? this.spy : this.page;
+    },
+    province() {
+      return this.locations.find((p) => String(p.province_id) === String(this.provinceId));
+    },
+    municipalities() {
+      return this.province ? this.province.municipalities : [];
+    },
+    municipality() {
+      return this.municipalities.find((m) => String(m.municipality_id) === String(this.municipalityId));
+    },
+    barangays() {
+      return this.municipality ? this.municipality.barangays || [] : [];
+    },
+    visibleBarangays() {
+      return this.expanded ? this.barangays : this.barangays.slice(0, COLLAPSED_COUNT);
+    },
+    statusText() {
+      if (this.loadFailed) return "Can't load locations right now. Is the server running on port 3000?";
+      if (this.loadingLocations) return "Loading locations…";
+      if (this.municipality && !this.barangays.length) return "No barangays are listed for this municipality yet.";
+      return "";
+    },
+  },
 
-/* ---------- Picker ---------- */
-function fillOptions(select, placeholder, items, valueKey, labelKey) {
-  select.replaceChildren(new Option(placeholder, ""));
-  items.forEach((item) => select.add(new Option(item[labelKey], item[valueKey])));
-  select.disabled = items.length === 0;
-}
+  methods: {
+    /* ---------- Navigation: show and hide ---------- */
+    async go(target) {
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-function selectedProvince() {
-  return locations.find((p) => String(p.province_id) === provinceEl.value);
-}
+      if (target === "contact" || target === "about") {
+        this.page = target;
+        window.scrollTo({ top: 0 });
+        return;
+      }
 
-function selectedMunicipality() {
-  const p = selectedProvince();
-  return p && p.municipalities.find((m) => String(m.municipality_id) === municipalityEl.value);
-}
+      const comingBack = this.page !== "home";
+      this.page = "home";
+      await nextTick();
+      const behavior = comingBack || reduced ? "auto" : "smooth";
+      if (target === "home") window.scrollTo({ top: 0, behavior });
+      else document.getElementById("barangay").scrollIntoView({ behavior, block: "start" });
+      this.updateSpy();
+    },
 
-function renderList() {
-  const m = selectedMunicipality();
-  listEl.replaceChildren();
-  toggleEl.hidden = true;
-  resultsEl.hidden = true;
-  // Big empty space with a hint until a municipality is picked
-  emptyEl.hidden = !!m || loadFailed;
-  if (!m) return;
+    updateSpy() {
+      if (this.page !== "home") return;
+      if (!this.$refs.header.offsetHeight) return;
+      const barangay = document.getElementById("barangay");
+      const line = this.$refs.header.offsetHeight + 80;
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      this.spy = barangay && (barangay.getBoundingClientRect().top <= line || atBottom) ? "barangay" : "home";
+    },
 
-  const all = m.barangays || [];
-  if (!all.length) {
-    statusEl.textContent = "No barangays are listed for this municipality yet.";
-    return;
-  }
-  statusEl.textContent = "";
-  resultsEl.hidden = false;
+    /* ---------- Barangay picker ---------- */
+    onProvinceChange() {
+      this.municipalityId = "";
+      this.expanded = false;
+    },
 
-  (expanded ? all : all.slice(0, COLLAPSED_COUNT)).forEach((b) => {
-    const li = document.createElement("li");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "brgy-btn";
-    btn.dataset.brgyId = b.brgy_id;
-    btn.textContent = b.brgy_name;
-    li.appendChild(btn);
-    listEl.appendChild(li);
-  });
+    async loadLocations() {
+      try {
+        const res = await fetch(`${API_URL}/locations`);
+        if (!res.ok) throw new Error();
+        this.locations = await res.json();
+      } catch (e) {
+        this.loadFailed = true;
+      }
+      this.loadingLocations = false;
+    },
 
-  if (all.length > COLLAPSED_COUNT) {
-    toggleEl.hidden = false;
-    toggleEl.replaceChildren(
-      document.createTextNode(expanded ? "See Less " : "See All "),
-      Object.assign(document.createElement("span"), { textContent: expanded ? "⌃" : "⌄", ariaHidden: "true" })
-    );
-    toggleEl.setAttribute("aria-expanded", String(expanded));
-  }
-}
+    /* ---------- Contact form ---------- */
+    validate() {
+      const { name, email, message } = this.form;
+      this.errors.name = name.trim() ? "" : "Please type your name.";
+      if (!email.trim()) this.errors.email = "Please type your email address.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) this.errors.email = "This does not look like an email address. It should look like name@example.com.";
+      else this.errors.email = "";
+      this.errors.message = message.trim().length >= 10 ? "" : "Please write your message. A few words is enough.";
+      return ["name", "email", "message"].find((field) => this.errors[field]);
+    },
 
-function onProvinceChange() {
-  const p = selectedProvince();
-  expanded = false;
-  statusEl.textContent = "";
-  fillOptions(municipalityEl, "Enter your municipality", p ? p.municipalities : [], "municipality_id", "municipality_name");
-  renderList();
-}
+    async sendMessage() {
+      this.result = null;
+      const firstBad = this.validate();
+      if (firstBad) {
+        this.$refs[firstBad].focus();
+        return;
+      }
 
-function onMunicipalityChange() {
-  expanded = false;
-  statusEl.textContent = "";
-  renderList();
-}
+      this.sending = true;
+      try {
+        const res = await fetch(`${API_URL}/contact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: this.form.name.trim(),
+            email: this.form.email.trim(),
+            message: this.form.message.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error();
+        this.form = { name: "", email: "", message: "" };
+        this.result = { kind: "success", text: "Thank you! Your message was sent. We will reply to your email soon." };
+      } catch (e) {
+        this.result = { kind: "error", text: "Sorry, we could not send your message right now. Please try again later, or call or email us using the details above." };
+      }
+      this.sending = false;
+      await nextTick();
+      if (this.$refs.result) this.$refs.result.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    },
+  },
 
-async function loadLocations() {
-  try {
-    const res = await fetch(`${API_URL}/locations`);
-    if (!res.ok) throw new Error();
-    locations = await res.json();
-  } catch (e) {
-    loadFailed = true;
-    emptyEl.hidden = true;
-    statusEl.textContent = "Can't load locations right now. Is the server running on port 3000?";
-    return;
-  }
-  statusEl.textContent = "";
-  fillOptions(provinceEl, "Enter your province", locations, "province_id", "province_name");
-}
+  mounted() {
+    document.querySelectorAll(".page-hero-logo").forEach((img) => {
+      const useOriginal = () => {
+        if (img.dataset.fallback) return;
+        img.dataset.fallback = "1";
+        img.src = "assets/logos/full_logo.png";
+      };
+      img.addEventListener("error", useOriginal);
+      if (img.complete && img.naturalWidth === 0) useOriginal();
+    });
 
-provinceEl.addEventListener("change", onProvinceChange);
-municipalityEl.addEventListener("change", onMunicipalityChange);
-toggleEl.addEventListener("click", () => {
-  expanded = !expanded;
-  renderList();
-});
-
-// Tab clicks scroll smoothly to the section without changing the address bar
-document.addEventListener("click", (e) => {
-  const link = e.target.closest('a[href^="#"]');
-  if (!link || link.getAttribute("href").length < 2) return;
-  e.preventDefault();
-  const id = link.getAttribute("href").slice(1);
-  const smooth = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-  if (id === "home") {
-    window.scrollTo({ top: 0, behavior: smooth });
-    return;
-  }
-  const target = document.getElementById(id);
-  if (target) target.scrollIntoView({ behavior: smooth, block: "start" });
-});
-
-window.addEventListener("scroll", updateActiveTab, { passive: true });
-window.addEventListener("resize", updateActiveTab);
-updateActiveTab();
-loadLocations();
+    window.addEventListener("scroll", this.updateSpy, { passive: true });
+    window.addEventListener("resize", this.updateSpy);
+    window.addEventListener("load", this.updateSpy);
+    requestAnimationFrame(this.updateSpy);
+    this.loadLocations();
+  },
+}).mount("#app");

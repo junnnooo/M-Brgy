@@ -1,19 +1,19 @@
 import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
 import {
-  accountsById, canTouchBarangay, check, fullName, httpError, numericId,
-  parseRef, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
+  canTouchBarangay, check, fullName, httpError, numericId,
+  parseRef, PERSON_COLUMNS, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireActiveAccount, requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 import { LIVE_REPORT_STATUSES, MAX_ACTIVE } from "./moderation.js";
 
 const router = Router();
-const SELECT = `*, ${PLACE_SELECT}`;
+const SELECT = `*, author:accounts!reports_account_id_fkey(${PERSON_COLUMNS}), ${PLACE_SELECT}`;
 const STATUSES = ["Submitted", "Received", "In Progress", "Resolved", "Rejected"];
 
-const toReport = (r, people = {}) => {
-  const a = people[r.account_id];
+const toReport = (r) => {
+  const a = r.author;
   return {
     id: r.report_id,
     ref: r.ref_no,
@@ -30,11 +30,6 @@ const toReport = (r, people = {}) => {
     email: a?.email ?? "",
     ...placeOf(r),
   };
-};
-
-const withPeople = async (rows) => {
-  const people = await accountsById(rows.map((r) => r.account_id));
-  return rows.map((r) => toReport(r, people));
 };
 
 const logUpdate = async (reportId, status, remark, accountId) =>
@@ -60,7 +55,7 @@ router.get("/mine", requireAuth, async (req, res) => {
       .eq("account_id", req.account.account_id)
       .order("created_at", { ascending: false }),
   );
-  res.json(await withPeople(rows));
+  res.json(rows.map(toReport));
 });
 
 router.get("/", requireAuth, requireStaff, async (req, res) => {
@@ -68,7 +63,7 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
     supabase.from("reports").select(SELECT).order("created_at", { ascending: false }),
     req.account,
   );
-  res.json(await withPeople(check(await query)));
+  res.json(check(await query).map(toReport));
 });
 
 // Track one report by its reference number (dashes optional) or internal id. Only the owner or staff may
@@ -90,9 +85,8 @@ router.get("/:id", requireAuth, async (req, res) => {
   const updates = check(
     await supabase.from("report_updates").select("*").eq("report_id", id).order("updated_at").order("update_id"),
   );
-  const people = await accountsById([report.account_id]);
   res.json({
-    ...toReport(report, people),
+    ...toReport(report),
     updated: toDay(updates.at(-1)?.updated_at) || toDay(report.created_at),
     history: updates.map((u) => ({ ref: u.ref_no, status: u.status, remark: u.remark, date: toDay(u.updated_at) })),
   });
@@ -131,11 +125,11 @@ router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
       .single(),
   );
   await logUpdate(created.report_id, "Submitted", "Report submitted by resident.", req.account.account_id);
-  res.status(201).json((await withPeople([created]))[0]);
+  res.status(201).json(toReport(created));
 });
 
 // Staff: change a report's status. Rejecting requires a reason (min 5 characters), which is stored on the
-// report (rejection_reason) and in the report's history (report_updates.remark).
+//        report (rejection_reason) and in the report's history (report_updates.remark).
 router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const id = numericId(req.params.id, "Report");
   const { status, remark, reason } = req.body ?? {};
@@ -176,7 +170,7 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
       { updateId: log.update_id },
     );
   }
-  const result = (await withPeople([updated]))[0];
+  const result = toReport(updated);
   result.updated = toDay(new Date().toISOString());
   res.json(result);
 });
@@ -202,7 +196,7 @@ router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
       .select(SELECT)
       .single(),
   );
-  res.json((await withPeople([updated]))[0]);
+  res.json(toReport(updated));
 });
 
 export default router;

@@ -1,15 +1,15 @@
 import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
 import {
-  accountsById, canTouchBarangay, check, formatTime, fullName, httpError,
-  numericId, parseRef, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
+  canTouchBarangay, check, formatTime, fullName, httpError, numericId, parseRef,
+  PERSON_COLUMNS, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
 import { requireActiveAccount, requireAuth, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 import { LIVE_REQUEST_STATUSES, MAX_ACTIVE, docLimitFor } from "./moderation.js";
 
 const router = Router();
-const SELECT = `*, service_types(service_name, fee), ${PLACE_SELECT}`;
+const SELECT = `*, service_types(service_name, fee), submitter:accounts!requests_submitted_by_fkey(${PERSON_COLUMNS}), ${PLACE_SELECT}`;
 const STATUSES = ["Pending", "Approved", "Ready for Pickup", "Completed", "Rejected"];
 const STATUS_MESSAGES = {
   Pending: "is back to pending review.",
@@ -19,8 +19,8 @@ const STATUS_MESSAGES = {
   Rejected: "was rejected. Visit the barangay hall for details.",
 };
 
-const toRequest = (r, people = {}) => {
-  const a = people[r.submitted_by];
+const toRequest = (r) => {
+  const a = r.submitter;
   return {
     id: r.request_id,
     ref: r.ref_no,
@@ -41,11 +41,6 @@ const toRequest = (r, people = {}) => {
   };
 };
 
-const withPeople = async (rows) => {
-  const people = await accountsById(rows.map((r) => r.submitted_by));
-  return rows.map((r) => toRequest(r, people));
-};
-
 // Resident: my own requests (archived ones included, residents can still track them)
 router.get("/mine", requireAuth, async (req, res) => {
   const rows = check(
@@ -55,7 +50,7 @@ router.get("/mine", requireAuth, async (req, res) => {
       .eq("submitted_by", req.account.account_id)
       .order("created_at", { ascending: false }),
   );
-  res.json(await withPeople(rows));
+  res.json(rows.map(toRequest));
 });
 
 // Staff: everything in their barangay
@@ -64,11 +59,11 @@ router.get("/", requireAuth, requireStaff, async (req, res) => {
     supabase.from("requests").select(SELECT).order("created_at", { ascending: false }),
     req.account,
   );
-  res.json(await withPeople(check(await query)));
+  res.json(check(await query).map(toRequest));
 });
 
 // Track a Request by its reference number (e.g. 0402104008-10-2026-00001, dashes optional) or its
-// internal id. Anyone can look one up, but only the submitter or staff of the barangay can see it.
+// internal id.
 router.get("/:id", requireAuth, async (req, res) => {
   const ref = parseRef(req.params.id);
   if (ref && (ref.kind !== "10" || ref.update)) throw httpError(404, "Request not found.");
@@ -81,11 +76,11 @@ router.get("/:id", requireAuth, async (req, res) => {
     (request.submitted_by === req.account.account_id ||
       (req.isStaff && canTouchBarangay(req.account, request.brgy_id)));
   if (!allowed) throw httpError(404, "Request not found.");
-  res.json((await withPeople([request]))[0]);
+  res.json(toRequest(request));
 });
 
 // Resident: request one or more documents from one barangay. Send service_type_ids (an array), or the older
-// single service_type_id. Every document becomes its own request with its own reference number.
+//           single service_type_id. Every document becomes its own request with its own reference number.
 // Limits: the barangay's documents-per-submission cap, and MAX_ACTIVE active requests per resident.
 router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
   const { brgy_id, purpose, appointment_date, appointment_time } = req.body ?? {};
@@ -150,12 +145,12 @@ router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
       ),
     );
   }
-  const result = await withPeople(created);
+  const result = created.map(toRequest);
   res.status(201).json(many ? result : result[0]);
 });
 
 // Staff: change a request's status. Rejecting requires a reason (min 5 characters), stored in
-// requests.rejection_reason and cleared again if the request later moves to another status.
+//        requests.rejection_reason and cleared again if the request later moves to another status.
 router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
   const id = numericId(req.params.id, "Request");
   const { status, reason } = req.body ?? {};
@@ -196,7 +191,7 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
       { requestId: id },
     );
   }
-  res.json((await withPeople([updated]))[0]);
+  res.json(toRequest(updated));
 });
 
 // Staff: move a request out of the active list (or back). Needs requests.archived_at (1.0.3 migration).
@@ -220,7 +215,7 @@ router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
       .select(SELECT)
       .single(),
   );
-  res.json((await withPeople([updated]))[0]);
+  res.json(toRequest(updated));
 });
 
 export default router;

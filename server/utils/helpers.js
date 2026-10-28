@@ -22,8 +22,8 @@ export function numericId(value, label = "Record") {
 }
 
 // Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update 2 digits>]
-//   10 = document request, 20 = concern report, 21 = an update to a concern report.
-// Accepts the number with or without dashes. Returns null if it isn't a reference number.
+//                    10 = document request, 20 = concern report, 21 = an update to a concern report.
+//                    Accepts the number with or without dashes. Returns null if it isn't a reference number.
 export function parseRef(value) {
   const m = String(value ?? "")
     .replace(/\s+/g, "")
@@ -69,6 +69,11 @@ export const scopeToBarangay = (query, account, column = "brgy_id") =>
 
 export const canTouchBarangay = (account, brgyId) =>
   !account.brgy_id || account.brgy_id === brgyId;
+
+
+// Person Columns: the account fields embedded into request / report queries (one query instead of two).
+//                 Only what the screens show: never password data, roles, or deactivation details.
+export const PERSON_COLUMNS = "first_name, middle_name, last_name, email, contact_number";
 
 
 // Place Select Helper: Returns an object with the barangay, municipality, 

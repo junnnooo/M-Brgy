@@ -6,6 +6,16 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 2.2.0 (OPTIMIZATION UPDATE PART 1 + MINOR UPDATE)
+
+    (+) Added/Applied proper AJAX formating to make the server feel more responsive and fast
+    (+) Added new Indexes in the Database to help fetching
+    (+) Added a Contact Us in the Landing Page
+
+    (~) Modified/Revamped locations.js and fix some functions to house cache system
+    (~) Adjusted auth.js in middleware and accounts.js to handel a more better way to verify users
+
+
 ## Version: 2.1.1
 
     (~) Fixed Bug in Combo boxes, Database, Routes, Not Properly Hooked Up
