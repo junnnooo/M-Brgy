@@ -12,6 +12,7 @@ import reportsRouter from "./routes/reports.js";
 import accountsRouter from "./routes/accounts.js";
 import barangaysRouter from "./routes/barangays.js";
 import notificationsRouter from "./routes/notifications.js";
+import superRouter from "./routes/super.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,6 +43,7 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/accounts", accountsRouter);
 app.use("/api/barangays", barangaysRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/super", superRouter);
 
 app.use(express.static(path.join(__dirname, "../client")));
 

@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { supabase } from "../utils/supabase.js";
 import { check, httpError, VERIFIED } from "../utils/helpers.js";
 
+// Super Admin = the "Admin" role (weight 75). The Owner (100) passes too. Staff (50) is the normal staff panel.
+
 export const STAFF_WEIGHT = 50;
+export const SUPER_WEIGHT = 75;
 export const ADMIN_WEIGHT = 100;
 
 export const ACCOUNT_SELECT =
@@ -19,7 +22,6 @@ const versions = new Map();
 
 const hashToken = (token) => createHash("sha256").update(token).digest("base64url");
 
-// The token was already validated by Supabase; this only reads its expiry so we never trust it for longer.
 function tokenExpiryMs(token) {
   try {
     const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
@@ -92,8 +94,6 @@ async function accountFor(userId, skipCache) {
   });
 }
 
-// Call this right after the app changes an account row (verification, deactivation, reactivation),
-// so the very next request from that person sees the change.
 export function invalidateAccount(accountId) {
   if (!accountId) return;
   versions.set(accountId, (versions.get(accountId) ?? 0) + 1);
@@ -110,19 +110,31 @@ export async function requireAuth(req, res, next) {
   const userId = await userIdFor(token, hashToken(token));
   const cached = await accountFor(userId, req.baseUrl === "/api/auth");
   if (!cached) throw httpError(403, "This login has no kaBRGY account profile.");
+  if (cached.deleted_at) throw httpError(401, "This account has been deleted."); // deleted by the Super Admin
 
-  const account = structuredClone(cached); // this request's own copy
+  // Still on a temporary password: until it is changed, only /auth/me and /auth/change-password answer
+  if (cached.must_change_password && !(req.baseUrl === "/api/auth" && ["/me", "/change-password"].includes(req.path))) {
+    throw httpError(403, "Please change your temporary password first.");
+  }
+
+  const account = structuredClone(cached);
   const weight = account.roles?.weight ?? 0;
   req.account = account;
   req.isVerified = account.verification_status === VERIFIED;
   req.isStaff = weight >= STAFF_WEIGHT;
   req.isAdmin = weight >= ADMIN_WEIGHT;
+  req.isSuper = weight >= SUPER_WEIGHT;
   req.isDeactivated = !req.isStaff && Boolean(account.deactivated_at);
   next();
 }
 
 export function requireStaff(req, res, next) {
   if (!req.isStaff) throw httpError(403, "Barangay staff access only.");
+  next();
+}
+
+export function requireSuper(req, res, next) {
+  if (!req.isSuper) throw httpError(403, "Super Admin access only.");
   next();
 }
 

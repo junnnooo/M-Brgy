@@ -6,6 +6,43 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 3.0.0-c (MAJOR OVERHAUL UPDATE PART 3)
+
+    (+) Added the Change Password screen, an account on a temporary password (must_change_password = true) has to change it before anything else opens
+    (+) Added POST /api/auth/change-password (temporary password first, then the new password, 8 characters minimum)
+
+    (~) Reset Password by the Super Admin now flags residents too, not only staff
+    (~) Until the password is changed the server only answers /auth/me and /auth/change-password for that account
+    (~) style.css, api.js and app.js are loaded with a version tag (?v=3.0.0-c) so the browser never keeps an old copy, change the tag on every update
+
+## Version: 3.0.0-b (MAJOR OVERHAUL UPDATE PART 2)
+
+    (+) Added the Super Admin: 
+        the "Admin" role (weight 75) opens the Staff Portal plus Account modification (the Owner too)
+    (+) Added Account modification (Super Admin only) with Staff and Residents tabs and a search
+    (+) A Super Admin only sees and manages accounts of their own barangay, only the Owner (role 4) sees every barangay
+    (+) Added Reset Password, the account gets a temporary password that is shown once
+    (+) Added Delete Account, the login is closed and the email is freed, requests and reports stay in the records as "Deleted account"
+    (+) Added Create Staff Account, the Super Admin can only create a staff account
+    (+) Added server/routes/super.js and requireSuper in middleware/auth.js
+    (+) Added accounts.must_change_password and accounts.deleted_at in the Database
+
+    (↑) Updated routes/auth.js (is_super), routes/accounts.js (deleted accounts are not listed), utils/helpers.js (MIN_PASSWORD), index.js
+    (↑) Updated scripts/create-admin.js, role 3 is the Super Admin and the password needs 8 characters
+
+## Version: 3.0.0-a (MAJOR OVERHAUL UPDATE PART 1)
+Porting the old-prototype changes (README 10/26/2026 to 11/4/2026) into client and server, part 1.
+
+    (~) Merged the Resident and Admin log in into one "Account Log in", the role from /auth/me decides which view opens
+    (~) Password 6 Characters to 8 Characters 
+        > client/app/app.js 
+        > client/app/index.html
+        > server/routes/auth.js
+
+    (+) Added a password character counter in Create a resident account
+
+    (-) Removed the separate Admin account tab and its log in form
+
 ## Version: 2.2.1 (OPTIMIZATION UPDATE PART 2 + MINOR UPDATE)
 
     (+) Added a Loading screen to make sure that the website is fully loaded

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase, createAuthClient } from "../utils/supabase.js";
-import { check, httpError, PENDING, VERIFIED } from "../utils/helpers.js";
-import { ACCOUNT_SELECT, STAFF_WEIGHT, requireAuth } from "../middleware/auth.js";
+import { check, httpError, MIN_PASSWORD, PENDING, VERIFIED } from "../utils/helpers.js";
+import { ACCOUNT_SELECT, ADMIN_WEIGHT, STAFF_WEIGHT, SUPER_WEIGHT, invalidateAccount, requireAuth } from "../middleware/auth.js";
 import { standingFields, standingOf } from "./moderation.js";
 
 const router = Router();
@@ -20,6 +20,9 @@ export const toMe = (a) => ({
   barangay: a.barangays ?? null,
   role: a.roles?.role_name ?? "",
   is_staff: (a.roles?.weight ?? 0) >= STAFF_WEIGHT,
+  is_super: (a.roles?.weight ?? 0) >= SUPER_WEIGHT,
+  is_owner: (a.roles?.weight ?? 0) >= ADMIN_WEIGHT,
+  must_change_password: Boolean(a.must_change_password),
 });
 
 // toMe + the account's moderation standing (deactivation, active warnings, latest appeal)
@@ -46,7 +49,9 @@ router.post("/signup", async (req, res) => {
   if (!first_name?.trim() || !last_name?.trim() || !email?.trim() || !password) {
     throw httpError(400, "Please fill in every field.");
   }
-  if (password.length < 6) throw httpError(400, "Use a password with at least 6 characters.");
+  if (password.length < MIN_PASSWORD) {
+    throw httpError(400, `Use a password with at least ${MIN_PASSWORD} characters.`);
+  }
 
   // Location IDs are 10-digit codes that start with 0, so keep them as strings (never Number()).
   const brgyId = String(brgy_id ?? "").trim();
@@ -61,7 +66,7 @@ router.post("/signup", async (req, res) => {
   const { data, error } = await supabase.auth.admin.createUser({
     email: cleanEmail,
     password,
-    email_confirm: true, // skip the confirmation email; the real check is on-site verification
+    email_confirm: true,
   });
   if (error) {
     const exists = error.code === "email_exists" || /already/i.test(error.message);
@@ -84,7 +89,7 @@ router.post("/signup", async (req, res) => {
     { onConflict: "account_id" },
   );
   if (profileError) {
-    await supabase.auth.admin.deleteUser(data.user.id); // don't leave a login with no profile
+    await supabase.auth.admin.deleteUser(data.user.id);
     throw httpError(400, `Couldn't create your profile: ${profileError.message}`);
   }
 
@@ -129,6 +134,39 @@ router.patch("/me", requireAuth, async (req, res) => {
       .single(),
   );
   res.json(await toMeWithStanding(updated));
+});
+
+// Change Password: needs the current (temporary) password first, then the new one.
+//                  This is also what clears "must_change_password" after a reset by the Super Admin.
+router.post("/change-password", requireAuth, async (req, res) => {
+  const { current_password, new_password } = req.body ?? {};
+  if (!current_password || !new_password) throw httpError(400, "Please fill in every field.");
+  if (new_password.length < MIN_PASSWORD) {
+    throw httpError(400, `Use a password with at least ${MIN_PASSWORD} characters.`);
+  }
+  if (new_password === current_password) {
+    throw httpError(400, "Your new password must be different from the temporary password.");
+  }
+
+  // Check the current password the same way a log in does. 400, not 401: a wrong password is not an expired session.
+  const attempt = await createAuthClient().auth.signInWithPassword({
+    email: req.account.email,
+    password: current_password,
+  });
+  if (attempt.error || !attempt.data.session) throw httpError(400, "The temporary password is incorrect.");
+
+  const { error } = await supabase.auth.admin.updateUserById(req.account.account_id, { password: new_password });
+  if (error) throw httpError(400, `Couldn't change the password: ${error.message}`);
+
+  check(
+    await supabase
+      .from("accounts")
+      .update({ must_change_password: false })
+      .eq("account_id", req.account.account_id)
+      .select("account_id"),
+  );
+  invalidateAccount(req.account.account_id);
+  res.json(await signIn(req.account.email, new_password)); // fresh tokens for the new password
 });
 
 export default router;

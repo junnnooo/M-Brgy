@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=3.0.0-c" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
@@ -26,14 +26,14 @@
       </span>
     </a>
 
-    <nav v-if="role==='resident' && !resident.deactivated" class="desktop-nav">
+    <nav v-if="role==='resident' && !resident.deactivated && !mustChange" class="desktop-nav">
       <button :class="{active:page==='home'}" @click="page='home'">Home</button>
       <button :class="{active:page==='announcements'}" @click="page='announcements'">Announcements</button>
       <button :class="{active:page==='services'}" @click="page='services'">Services</button>
     </nav>
 
     <div v-if="role" class="header-actions">
-      <div v-if="role==='resident' && !resident.deactivated" class="notif-wrap">
+      <div v-if="role==='resident' && !resident.deactivated && !mustChange" class="notif-wrap">
         <button class="bell" @click="toggleNotifications" :aria-expanded="notifOpen" aria-label="Notifications" title="Notifications">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -68,7 +68,7 @@
 
       </div>
       
-      <div v-if="role==='resident' && !resident.deactivated" class="user-wrap">
+      <div v-if="role==='resident' && !resident.deactivated && !mustChange" class="user-wrap">
         <button class="avatar" @click="toggleMenu" :aria-expanded="menuOpen" aria-haspopup="menu" aria-label="Account menu" title="Account menu">{{ residentInitial }}</button>
 
         <div v-if="menuOpen" class="user-menu" role="menu" aria-label="Account menu">
@@ -92,7 +92,7 @@
         </div>
       </div>
       <template v-else>
-        <span v-if="role==='admin'" class="header-role">Staff Portal</span>
+        <span v-if="role==='admin'" class="header-role">{{isSuper ? 'Super Admin Portal' : 'Staff Portal'}}</span>
         <button class="btn btn-ghost" @click="logout">Log out</button>
       </template>
 
@@ -100,7 +100,7 @@
   </header>
 
   <transition :css="false" @enter="bannerEnter" @leave="bannerLeave">
-  <div v-if="role==='resident' && !resident.deactivated && activeAlert && !emergencyDismissed">
+  <div v-if="role==='resident' && !resident.deactivated && !mustChange && activeAlert && !emergencyDismissed">
   <div class="emergency-banner topbar" role="alert">
     <span class="pulse"></span>
     <div class="emergency-copy">
@@ -118,28 +118,92 @@
     <div class="empty-state">Loading kaBRGY…</div>
   </main>
 
+  <main v-else-if="mustChange" class="auth-page">
+    <section class="auth-shell">
+
+      <aside class="auth-side">
+        <div class="plate">{{settings.name}}</div>
+        <h1>Set your own password.</h1>
+        <p>Your account is using a temporary password from the barangay. Choose a new password that only you know before you continue.</p>
+      </aside>
+
+      <div class="auth-main">
+        <div class="auth-card">
+
+          <div class="auth-pane">
+            <h2>Change Password</h2>
+            <p class="muted">Enter the temporary password you were given, then type your new password and confirm it.</p>
+
+            <form class="auth-form" @submit.prevent="changePassword">
+
+              <label>Temporary password
+                <span class="pw-field">
+                  <input v-model="changeForm.current" :type="showPw.cpCurrent ? 'text' : 'password'" required autocomplete="current-password" placeholder="The temporary password you were given" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpCurrent}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpCurrent')">
+                    <svg v-if="!showPw.cpCurrent" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
+              </label>
+
+              <label>New password
+                <span class="pw-field">
+                  <input v-model="changeForm.next" :type="showPw.cpNew ? 'text' : 'password'" required :minlength="minPassword" autocomplete="new-password" placeholder="At least 8 characters" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpNew}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpNew')">
+                    <svg v-if="!showPw.cpNew" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
+                <span class="char-count" :class="{ok:changeForm.next.length>=minPassword}" aria-live="polite">{{changeForm.next.length}} / {{minPassword}} characters</span>
+              </label>
+
+              <label>Confirm new password
+                <span class="pw-field">
+                  <input v-model="changeForm.confirm" :type="showPw.cpConfirm ? 'text' : 'password'" required autocomplete="new-password" placeholder="Type the new password again" />
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpConfirm}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpConfirm')">
+                    <svg v-if="!showPw.cpConfirm" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+                  </button>
+                </span>
+                <span class="char-count" aria-live="polite">{{changeForm.confirm.length}} character{{changeForm.confirm.length===1?'':'s'}} typed</span>
+              </label>
+
+              <div v-if="changeError" class="auth-error" role="alert">{{changeError}}</div>
+              <button class="btn btn-primary btn-wide" type="submit" :disabled="changeBusy">{{changeBusy ? 'Saving…' : 'Change password and continue'}}</button>
+
+            </form>
+
+            <p class="auth-switch">Not you?
+              <button type="button" class="text-link" @click="logout">Log out</button>
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
   <main v-else-if="!role" class="auth-page">
     <section class="auth-shell">
 
       <aside class="auth-side">
         <div class="plate">{{settings.name}}</div>
         <h1>Log in to your barangay account.</h1>
-        <p>Residents can request documents and report concerns. Barangay officials review and update them. Pick your account type to continue.</p>
+        <p>Residents can request documents and report concerns. Barangay officials review and update them. Log in with your account to continue.</p>
       </aside>
 
       <div class="auth-main">
-        <div class="auth-card" :class="{'is-admin':authView==='admin'}">
+        <div class="auth-card">
 
-          <div class="auth-tabs" role="tablist">
-            <button type="button" role="tab" :aria-selected="authView==='resident'" :class="{active:authView==='resident'}" @click="setAuthView('resident')">Resident account</button>
-            <button type="button" role="tab" :aria-selected="authView==='admin'" :class="{active:authView==='admin'}" @click="setAuthView('admin')">Admin account</button>
-          </div>
-
-          <div v-if="authView==='resident'" class="auth-pane" role="tabpanel">
-            <h2>{{authMode==='login' ? 'Resident log in' : 'Create a resident account'}}</h2>
+          <div class="auth-pane">
+            <h2>{{authMode==='login' ? 'Account Log in' : 'Create a resident account'}}</h2>
             <p class="muted">{{authMode==='login' ? 'Log in to request documents, report concerns, and follow updates.' : 'Sign up with your email. You can add your address and contact number after logging in.'}}</p>
 
-            <form v-if="authMode==='login'" class="auth-form" @submit.prevent="loginResident">
+            <form v-if="authMode==='login'" class="auth-form" @submit.prevent="loginAccount">
 
               <label>Email address
                 <input v-model="loginForm.email" type="email" required autocomplete="username" placeholder="name@example.com" />
@@ -187,12 +251,13 @@
 
               <label>Password
                 <span class="pw-field">
-                  <input v-model="signupForm.password" :type="showPw.signup ? 'text' : 'password'" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" />
+                  <input v-model="signupForm.password" :type="showPw.signup ? 'text' : 'password'" required :minlength="minPassword" autocomplete="new-password" placeholder="At least 8 characters" />
                   <button type="button" class="pw-eye" :class="{on:showPw.signup}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('signup')">
                     <svg v-if="!showPw.signup" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
                 </span>
+                <span class="char-count" :class="{ok:signupForm.password.length>=minPassword}" aria-live="polite">{{signupForm.password.length}} / {{minPassword}} characters</span>
               </label>
 
               <label>Confirm password
@@ -203,6 +268,7 @@
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
                 </span>
+                <span class="char-count" aria-live="polite">{{signupForm.confirm.length}} character{{signupForm.confirm.length===1?'':'s'}} typed</span>
               </label>
 
               <div v-if="authError" class="auth-error" role="alert">{{authError}}</div>
@@ -216,32 +282,6 @@
               </button>
             </p>
 
-          </div>
-
-          <div v-else class="auth-pane" role="tabpanel">
-            <h2>Admin log in</h2>
-            <p class="muted">For barangay officials only. Manage verifications, document requests, concern reports, and announcements.</p>
-            <form class="auth-form" @submit.prevent="loginAdmin">
-
-              <label>Email address
-                <input v-model="adminForm.email" type="email" required autocomplete="username" placeholder="admin@example.com" />
-              </label>
-
-              <label>Password
-                <span class="pw-field">
-                  <input v-model="adminForm.password" :type="showPw.admin ? 'text' : 'password'" required autocomplete="current-password" placeholder="Admin password" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.admin}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('admin')">
-                    <svg v-if="!showPw.admin" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
-                  </button>
-                </span>
-              </label>
-
-              <div v-if="authError" class="auth-error" role="alert">{{authError}}</div>
-              <button class="btn btn-primary btn-wide" type="submit">Log in to admin</button>
-
-            </form>
-            
           </div>
 
         </div>
@@ -1156,6 +1196,10 @@
         <i>{{pendingResidents.length + pendingAppeals.length}}</i>
       </button>
       
+      <button v-if="isSuper" :class="{active:adminPage==='accounts'}" title="Account modification" @click="adminPage='accounts'">✎ 
+        <span>Account modification</span>
+      </button>
+      
       <button :class="{active:adminPage==='documents'}" title="Document requests" @click="adminPage='documents'">▤ 
         <span>Document requests</span>
         <i>{{pendingRequests.length}}</i>
@@ -1175,11 +1219,11 @@
       </button>
       
       <div class="sidebar-bottom">
-        <div class="official-avatar">BA</div>
+        <div class="official-avatar">{{isSuper ? 'SA' : 'BA'}}</div>
         
         <div>
-          <b>Barangay Account</b>
-          <small>Staff Account</small>
+          <b>{{isSuper ? (residentName || 'Super Admin') : 'Barangay Account'}}</b>
+          <small>{{isSuper ? 'Super Admin Account' : 'Staff Account'}}</small>
 
         </div>
 
@@ -1453,6 +1497,94 @@
 
         <p class="table-note">Note: real on-site ID checking must be performed by authorized barangay staff before marking a resident verified.</p>
       
+      </section>
+
+      <section v-else-if="adminPage==='accounts' && isSuper" class="panel admin-table-panel account-mod">
+        <div class="panel-heading">
+          <h3>Account modification</h3>
+          <span class="muted">{{modTotal}} {{modTab==='staff' ? 'admin/staff' : 'resident'}} account(s)<template v-if="modTotal > modList.length"> · showing the latest {{modList.length}}</template></span>
+        </div>
+
+        <div class="admin-toolbar">
+          <div class="view-tabs" role="tablist" aria-label="Choose account type">
+            <button type="button" :class="['filter-chip',{selected:modTab==='staff'}]" @click="modTab='staff'">Staff</button>
+            <button type="button" :class="['filter-chip',{selected:modTab==='residents'}]" @click="modTab='residents'">Residents</button>
+          </div>
+
+          <input v-model="modSearch" type="search" class="admin-search" :placeholder="modTab==='staff' ? 'Search by staff name / email' : 'Search by resident Gmail / email'" aria-label="Search accounts" />
+
+          <button v-if="modTab==='staff'" type="button" class="btn btn-primary create-account-btn" @click="openCreateDialog">+ Create Staff Account</button>
+        </div>
+
+        <div class="table-wrap">
+          <table v-if="modTab==='staff'">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Email</th>
+                <th v-if="isOwner">Barangay</th>
+                <th>Role</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in modList" :key="a.id">
+                <td><b>{{a.name||'Staff account'}}</b></td>
+                <td>{{a.email}}</td>
+                <td v-if="isOwner">{{a.barangay||'—'}}<small v-if="a.municipality" class="muted"> · {{a.municipality}}</small></td>
+                <td><span class="status-pill status-submitted">Admin / Staff</span></td>
+                <td>
+                  <div class="row-actions">
+                    <button class="small-action" @click="openModDialog('reset',a)">Reset Password</button>
+                    <button class="small-action danger" @click="openModDialog('delete',a)">Delete Account</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!modList.length">
+                <td :colspan="isOwner ? 5 : 4" class="empty-cell">
+                  {{modLoading ? 'Loading accounts…' : modSearch.trim() ? 'No staff account matches that search.' : 'There are no Staff accounts yet. Use Create Staff account to add one.'}}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table v-else>
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Email</th>
+                <th v-if="isOwner">Barangay</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in modList" :key="a.id">
+                <td><b>{{a.name||'Unnamed resident'}}</b></td>
+                <td>{{a.email}}</td>
+                <td v-if="isOwner">{{a.barangay||'—'}}<small v-if="a.municipality" class="muted"> · {{a.municipality}}</small></td>
+                <td>
+                  <span class="status-pill" :class="a.deactivated ? 'status-rejected' : a.verified ? 'status-done' : 'status-pending'">{{a.deactivated ? 'Deactivated' : a.verified ? 'Verified' : 'Pending'}}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button class="small-action" @click="openModDialog('reset',a)">Reset Password</button>
+                    <button class="small-action danger" @click="openModDialog('delete',a)">Delete Account</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!modList.length">
+                <td :colspan="isOwner ? 5 : 4" class="empty-cell">
+                  {{modLoading ? 'Loading accounts…' : modSearch.trim() ? 'No resident matches that email.' : 'There are no resident accounts yet.'}}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="table-note">
+          Note: only the Super Admin can create Staff Accounts, reset passwords and delete accounts, and only for their own barangay (the Owner sees every barangay). These actions take effect right away.
+        </p>
       </section>
 
       <section v-else-if="adminPage==='documents'" class="panel admin-table-panel">
@@ -1818,7 +1950,7 @@
       </div>
     </div>
     
-    <div v-if="role==='resident'" class="footer-links">
+    <div v-if="role==='resident' && !mustChange" class="footer-links">
       <button @click="page='announcements'">Announcements</button>
       <label class="footer-copy">·</label>
       <button @click="page='manual'">User guide</button>
@@ -1855,7 +1987,116 @@
     </form>
   </div>
 
-  <div v-if="warningAck && role==='resident' && !resident.deactivated" class="modal-backdrop" role="presentation">
+  <div v-if="createDialog && isSuper" class="modal-backdrop" @click.self="closeCreateDialog" role="presentation">
+    <form class="success-modal reject-modal create-modal" @submit.prevent="submitCreateAccount" role="dialog" aria-modal="true" aria-labelledby="create-dialog-title" autocomplete="off">
+      <button type="button" class="modal-close" @click="closeCreateDialog" aria-label="Close">×</button>
+
+      <template v-if="createDialog.done">
+        <h2 id="create-dialog-title">Staff account created</h2>
+        <p>{{createDialog.name}} · {{createDialog.email}}</p>
+        <p class="muted">Give this temporary password to the staff member. It is shown only once and cannot be viewed again. They must choose their own password the first time they log in.</p>
+        <div class="temp-row">
+          <code class="temp-password">{{createDialog.temp}}</code>
+          <button type="button" class="btn btn-ghost" @click="copyText(createDialog.temp)">{{copied ? 'Copied ✓' : 'Copy'}}</button>
+        </div>
+        <div class="reject-actions">
+          <button type="button" class="btn btn-primary" @click="closeCreateDialog">Done</button>
+        </div>
+      </template>
+
+      <template v-else>
+        <h2 id="create-dialog-title">Create Staff Account</h2>
+        <p class="muted">This creates a Staff account only. Residents create their own accounts through sign up.</p>
+
+        <div class="form-two">
+          <label>First name<input v-model="createDialog.first_name" type="text" required maxlength="40" placeholder="e.g. Juan" autocomplete="off" /></label>
+          <label>Last name<input v-model="createDialog.last_name" type="text" required maxlength="40" placeholder="e.g. Dela Cruz" autocomplete="off" /></label>
+        </div>
+
+        <label>Email address<input v-model="createDialog.email" type="email" required maxlength="80" placeholder="staff@example.com" autocomplete="off" autocapitalize="off" spellcheck="false" /></label>
+
+        <label v-if="isOwner">Barangay
+          <select v-model="createDialog.brgy_id" required>
+            <option value="" disabled>Select the barangay</option>
+            <option v-for="b in allBarangays" :key="b.brgy_id" :value="b.brgy_id">{{b.label}}</option>
+          </select>
+        </label>
+        <p v-else class="muted">Barangay: <b>{{me.barangay ? me.barangay.brgy_name : 'your barangay'}}</b>. Staff accounts are created inside your own barangay.</p>
+
+        <p class="muted">A temporary password is made when the account is created. You will see it once so you can copy it.</p>
+
+        <div class="disclaimer-note caution" role="note">
+          <b>Disclaimer</b>
+          <p>This account gets full Staff access to the official portal (resident verification, document requests, concern reports, announcements and settings) as soon as it is created.</p>
+          <p>Only create accounts for authorized barangay personnel, and share the login details with that person only. You can reset the password or delete the account later from this page.</p>
+        </div>
+
+        <label class="ack-row">
+          <input type="checkbox" v-model="createDialog.ack" />
+          <span>I understand and want to create this account.</span>
+        </label>
+
+        <div v-if="createError" class="auth-error" role="alert">{{createError}}</div>
+
+        <div class="reject-actions">
+          <button type="button" class="btn btn-ghost" @click="closeCreateDialog">Cancel</button>
+          <button type="submit" class="btn btn-primary" :disabled="createDialog.busy">{{createDialog.busy ? 'Creating…' : 'Create account'}}</button>
+        </div>
+      </template>
+
+    </form>
+  </div>
+
+  <div v-if="modDialog && isSuper" class="modal-backdrop" @click.self="closeModDialog" role="presentation">
+    <form class="success-modal reject-modal" @submit.prevent="confirmModDialog" role="dialog" aria-modal="true" aria-labelledby="mod-dialog-title">
+      <button type="button" class="modal-close" @click="closeModDialog" aria-label="Close">×</button>
+      <h2 id="mod-dialog-title">{{modDialog.mode==='reset' ? (modDialog.done ? 'Password reset' : 'Reset password') : 'Delete account'}}</h2>
+      <p>{{modDialog.account.name || (modDialog.kind==='staff' ? 'Staff account' : 'Unnamed resident')}} · {{modDialog.account.email}}</p>
+
+      <template v-if="modDialog.mode==='reset' && modDialog.done">
+        <p class="muted">Give this temporary password to the account owner. It is shown only once and cannot be viewed again. They must choose a new password the first time they log in.</p>
+        <div class="temp-row">
+          <code class="temp-password">{{modDialog.temp}}</code>
+          <button type="button" class="btn btn-ghost" @click="copyText(modDialog.temp)">{{copied ? 'Copied ✓' : 'Copy'}}</button>
+        </div>
+        <div class="reject-actions">
+          <button type="button" class="btn btn-primary" @click="closeModDialog">Done</button>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="disclaimer-note" :class="{caution:modDialog.mode==='reset'}" role="note">
+          <b>Disclaimer</b>
+          <template v-if="modDialog.mode==='reset'">
+            <p>Resetting replaces the current password with a new temporary one. The old password stops working immediately, so the account owner cannot log in until they use the new one.</p>
+            <p>Share the temporary password only with the real account owner, and only after confirming their identity. Do not send it through public or unsecured channels.</p>
+          </template>
+          <template v-else-if="modDialog.kind==='staff'">
+            <p>Deleting this Staff account is permanent and cannot be undone. The staff member will lose access to the staff portal right away.</p>
+            <p>Nobody can log in with this account again unless a new account is created. The requests and reports they handled stay in the barangay records.</p>
+          </template>
+          <template v-else>
+            <p>Deleting this resident account is permanent and cannot be undone. The profile (address, contact, verification status, warnings) and notifications will be removed, and the resident will lose access right away.</p>
+            <p>Their document requests and concern reports stay in the barangay records. To use the portal again, the resident must sign up and be verified from the start.</p>
+          </template>
+        </div>
+
+        <label class="ack-row">
+          <input type="checkbox" v-model="modDialog.ack" />
+          <span>I understand and want to {{modDialog.mode==='reset' ? 'reset this password' : 'delete this account'}}.</span>
+        </label>
+
+        <div v-if="modError" class="auth-error" role="alert">{{modError}}</div>
+
+        <div class="reject-actions">
+          <button type="button" class="btn btn-ghost" @click="closeModDialog">Cancel</button>
+          <button type="submit" :class="['btn', modDialog.mode==='reset' ? 'btn-primary' : 'btn-reject']" :disabled="modDialog.busy">{{modDialog.mode==='reset' ? 'Reset password' : 'Delete account'}}</button>
+        </div>
+      </template>
+    </form>
+  </div>
+
+  <div v-if="warningAck && role==='resident' && !resident.deactivated && !mustChange" class="modal-backdrop" role="presentation">
     <div class="success-modal warning-modal" role="alertdialog" aria-modal="true">
       <div class="success-mark warning-mark">!</div>
       <h2>Account warning {{resident.warnings.length}} of {{maxWarnings}}</h2>
@@ -1927,8 +2168,8 @@
 
 </div>
 
-<script src="api.js"></script>
-<script src="app.js"></script>
+<script src="api.js?v=3.0.0-c"></script>
+<script src="app.js?v=3.0.0-c"></script>
 
 </body>
 </html>

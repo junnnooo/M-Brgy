@@ -4,6 +4,9 @@ const { createApp } = Vue;
 // between midnight and 8 AM in Manila.
 const todayString = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
+// Password: 8 characters minimum (was 6). Same number as MIN_PASSWORD in server/routes/auth.js
+const MIN_PASSWORD = 8;
+
 // Reference numbers: <brgy PSGC>-<10|20|21>-<year>-<5 digits>[-<update>], dashes optional.
 //                    10 = document request, 20 = concern report, 21 = update to a concern report.
 const parseRef = (value) => {
@@ -15,7 +18,7 @@ const parseRef = (value) => {
   return { type, canonical: `${brgy}-${type}-${year}-${no}${update ? "-" + update : ""}` };
 };
 
-// Dismissed emergency banner: remembered per resident account, in this browser only
+// Dismissed Emergency Banner: remembered per resident account, in this browser only
 const DISMISSED_KEY = "kabrgy_dismissed_alerts";
 const loadDismissed = () => {
   try {
@@ -32,15 +35,12 @@ const saveDismissed = (map) => {
   }
 };
 
-// Notification sounds (paths are relative to client/app/index.html)
 const SOUNDS = {
   regular: new Audio("../assets/sound/Notif_Sound.wav"),
   emergency: new Audio("../assets/sound/Emergency_Notif_Sound.wav"),
 };
 Object.values(SOUNDS).forEach((a) => (a.preload = "auto"));
 
-// Several sources (bell, announcements, alerts) can report something new in the same poll.
-// Requests are gathered for a moment and ONE sound plays (emergency wins), so nothing overlaps or restarts.
 let pendingSound = null;
 let soundTimer = null;
 const playSound = (kind) => {
@@ -58,8 +58,6 @@ const playSound = (kind) => {
   }, 600);
 };
 
-// Browsers only allow sound after a user gesture. On the first click/key/tap,
-// "prime" both sounds silently so later polled notifications can play.
 const unlockSounds = () => {
   Object.values(SOUNDS).forEach((a) => {
     a.muted = true;
@@ -90,21 +88,21 @@ const FINAL_STATUS = {
   report: ["Resolved", "Rejected"],
 };
 
-// Account moderation + limits (the server enforces the same numbers)
+// Account Moderation + Limits (the server enforces the same numbers)
 const MAX_WARNINGS = 3;
 const MAX_ACTIVE = 3;
 const LIVE_STATUS = {
   doc: ["Pending", "Approved", "Ready for Pickup"],
   report: ["Submitted", "Received", "In Progress"],
 };
-// Documents allowed per submission: Barangay 1 to 8 allow 2, every other barangay allows 3.
+// Documents Allowed per Submission: Barangay 1 to 8 allow 2, every other barangay allows 3.
 //                                   The number is read from the barangay name, e.g. "Lantic (Barangay 13)".
 const docLimitFor = (name) => {
   const n = Number(String(name || "").match(/barangay\s*(\d+)/i)?.[1]);
   return n >= 1 && n <= 8 ? 2 : 3;
 };
 
-// Admin side bar: collapsed or not, remembered in this browser
+// Admin Side Bar: collapsed or not, remembered in this browser
 const SIDEBAR_KEY = "kabrgy_sidebar_collapsed";
 const loadSidebar = () => {
   try {
@@ -124,6 +122,7 @@ const blankResident = () => ({
 });
 const defaultSettings = () => ({ name: "kaBRGY", address: "", hours: "" });
 const blankSignup = () => ({ first_name: "", last_name: "", email: "", brgy_id: "", password: "", confirm: "" });
+const blankChange = () => ({ current: "", next: "", confirm: "" });
 const blankPost = () => ({ title: "", type: "Announcement", body: "", date: todayString() });
 const blankDocumentForm = () => ({
   province_id: "", municipality_id: "", brgy_id: "",
@@ -151,19 +150,22 @@ createApp({
       reports: [],
       profiles: [],
       notifications: [],
-      knownNotifIds: null, // ids already seen, used to play a sound only for new notifications
+      knownNotifIds: null,
       knownPostIds: null,
       knownAlertIds: null,
-      archivedPosts: [], // staff only: archived announcements (hidden from residents)
-      archivedAlerts: [], // staff only: archived emergency alerts
+      archivedPosts: [],
+      archivedAlerts: [],
 
-      authView: "resident",
       authMode: "login",
       authError: "",
-      showPw: { login: false, signup: false, confirm: false, admin: false },
+      showPw: { login: false, signup: false, confirm: false, cpCurrent: false, cpNew: false, cpConfirm: false },
+      // Change Password (temporary password -> new password)
+      changeForm: blankChange(),
+      changeError: "",
+      changeBusy: false,
+      minPassword: MIN_PASSWORD,
       loginForm: { email: "", password: "" },
       signupForm: blankSignup(),
-      adminForm: { email: "", password: "" },
       page: "home",
       adminPage: "overview",
       sidebarCollapsed: loadSidebar(),
@@ -174,7 +176,7 @@ createApp({
       reportForm: blankReportForm(),
       postForm: blankPost(),
 
-      // admin tables: search by email + Active / Archived views
+      // Admin Tables: search by email + Active / Archived views
       verifSearch: "",
       docSearch: "",
       reportSearch: "",
@@ -198,26 +200,41 @@ createApp({
       reportStatusFilter: "All",
       docExpanded: false,
       reportExpanded: false,
-      trackLimit: 3, // rows shown before "See all"
+      trackLimit: 3,
 
-      // Reject dialog: staff must give a reason before rejecting a request or a report
+      // Reject Dialog: staff must give a reason before rejecting a request or a report
       rejectDialog: null,
       rejectError: "",
 
-      // Account moderation: staff dialog (warn / deactivate / deny an appeal), resident appeal + warning pop-up
+      // Account Moderation: staff dialog (warn / deactivate / deny an appeal), resident appeal + warning pop-up
       accountDialog: null,
       accountError: "",
       appealText: "",
       warningAck: false,
 
-      // Document form location: locked to the resident's own barangay until they confirm a change
+      // Super Admin only: account modification (staff + residents), create staff account
+      modTab: "staff",
+      modSearch: "",
+      modList: [],
+      modTotal: 0,
+      modLoading: false,
+      modSeq: 0,
+      modTimer: null,
+      modDialog: null,
+      modError: "",
+      createDialog: null,
+      createError: "",
+      copied: false,
+      copyTimer: null,
+
+      // Document Form Location: locked to the resident's own barangay until they confirm a change
       docLocationUnlocked: false,
       reportLocationUnlocked: false,
       locationWarn: false,
-      locationWarnTarget: "doc", // which form the warning is about: "doc" or "report"
+      locationWarnTarget: "doc",
 
       notifOpen: false,
-      menuOpen: false, // the avatar dropdown (Profile / Track Status / Log out)
+      menuOpen: false,
       modal: "",
       modalTitle: "",
       modalMessage: "",
@@ -234,6 +251,15 @@ createApp({
     role() {
       if (!this.me) return null;
       return this.me.is_staff ? "admin" : "resident";
+    },
+    isSuper() {
+      return Boolean(this.me && this.me.is_super);
+    },
+    isOwner() {
+      return Boolean(this.me && this.me.is_owner);
+    },
+    mustChange() {
+      return Boolean(this.me && this.me.must_change_password);
     },
     residentName() {
       const r = this.resident;
@@ -276,9 +302,9 @@ createApp({
     recentAdminAnnouncements() {
       return this.announcements.slice(0, 5);
     },
-    // Sticky: an alert stays on screen for as long as the server still lists it. It never times out
-    // on its own. It goes away when the resident dismisses it (X) or when it is archived/deleted,
-    // which the 10-second refresh notices. If a refresh fails, the current banner simply stays.
+    // Sticky: An alert stays on screen for as long as the server still lists it. It never times out
+    //         on its own. It goes away when the resident dismisses it (X) or when it is archived/deleted,
+    //         which the 10-second refresh notices. If a refresh fails, the current banner simply stays.
     activeAlert() {
       return [...this.alerts].sort((x, y) => String(y.starts_at).localeCompare(String(x.starts_at)))[0] || null;
     },
@@ -323,8 +349,6 @@ createApp({
       const b = this.brgys(this.documentForm).find((x) => x.brgy_id === this.documentForm.brgy_id);
       return b ? docLimitFor(b.brgy_name) : 0;
     },
-    // The location pickers are read-only while they show the resident's registered barangay.
-    // If we cannot work out that barangay, nothing is locked so the form stays usable.
     docLocationLocked() {
       return Boolean(this.me?.brgy_id && this.findLocation(this.me.brgy_id)) && !this.docLocationUnlocked;
     },
@@ -437,6 +461,7 @@ createApp({
       return {
         overview: "Official dashboard",
         verifications: "Resident verification",
+        accounts: "Account modification",
         documents: "Document requests",
         reports: "Concern reports",
         posts: "Announcements & alerts",
@@ -453,7 +478,6 @@ createApp({
         this.notify(`This barangay allows up to ${max} documents per request. Your selection was trimmed.`);
       }
     },
-    // a bulk selection never survives a change of what is on screen
     docStatusFilter() { this.docExpanded = false; },
     reportStatusFilter() { this.reportExpanded = false; },
     docView() { this.docSelected = []; },
@@ -462,9 +486,19 @@ createApp({
     reportView() { this.reportSelected = []; },
     reportFilter() { this.reportSelected = []; },
     reportSearch() { this.reportSelected = []; },
-    adminPage() { this.docSelected = []; this.reportSelected = []; },
+    adminPage() {
+      this.docSelected = [];
+      this.reportSelected = [];
+      if (this.adminPage === "accounts") this.queueModLoad(0);
+    },
+    modTab() {
+      this.modSearch = "";
+      this.modList = [];
+      this.modTotal = 0;
+      this.queueModLoad(0);
+    },
+    modSearch() { this.queueModLoad(300); },
     notifications(list) {
-      // Only residents get the bell. Logged out: forget everything so the next login starts fresh.
       if (this.role !== "resident") {
         this.knownNotifIds = null;
         return;
@@ -500,7 +534,9 @@ createApp({
       this.booting = false;
     },
     async loadSession() {
-      this.applyMe(await api.get("/auth/me"));
+      const me = await api.get("/auth/me");
+      this.applyMe(me);
+      if (me.must_change_password) return;
       await this.loadAll();
     },
     applyMe(me) {
@@ -572,7 +608,7 @@ createApp({
     },
     // Background refresh of the lists the signed-in user sees. Used by the polling timer.
     async refreshLive() {
-      if (!this.me || document.visibilityState === "hidden") return;
+      if (!this.me || this.mustChange || document.visibilityState === "hidden") return;
       try {
         if (this.role === "resident") {
           await Promise.all([this.loadNotifications(), this.refreshStanding(), this.refreshBoard()]);
@@ -583,8 +619,8 @@ createApp({
         /* the next poll will try again */
       }
     },
-    // Emergency banner: slides down from under the header, and back up behind it.
-    // Driven from JS (Web Animations), so it does not depend on any CSS file.
+    // Emergency banner: Slides down from under the header, and back up behind it.
+    //                   Driven from JS (Web Animations), so it does not depend on any CSS file.
     bannerEnter(el, done) { this.slideBanner(el, true, done); },
     bannerLeave(el, done) { this.slideBanner(el, false, done); },
     slideBanner(el, show, done) {
@@ -606,7 +642,7 @@ createApp({
         })
         .catch(done);
     },
-    // Residents: quietly re-fetch announcements and emergency alerts so new ones appear without a reload
+    // Residents: Quietly re-fetch announcements and emergency alerts so new ones appear without a reload
     async refreshBoard() {
       if (this.role !== "resident") return;
       const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
@@ -623,7 +659,6 @@ createApp({
         /* the next poll will try again */
       }
     },
-    // Play a sound when a list gains an id we haven't seen. The first load after login only records ids.
     boardSound(list, key, kind) {
       if (this.role !== "resident") {
         this[key] = null;
@@ -742,16 +777,16 @@ createApp({
       }
     },
 
-    // Hold-to-reveal for password fields: shows while pressed, hides on release / leave / blur
+    // Hold-to-reveal for password fields: Shows while pressed, hides on release / leave / blur
     pwEvents(key) {
       const set = (on) => { this.showPw[key] = on; };
       return {
-        pointerdown: (e) => { e.preventDefault(); set(true); }, // preventDefault keeps focus in the input
+        pointerdown: (e) => { e.preventDefault(); set(true); },
         pointerup: () => set(false),
         pointerleave: () => set(false),
         pointercancel: () => set(false),
         blur: () => set(false),
-        contextmenu: (e) => e.preventDefault(), // stops the long-press menu on phones
+        contextmenu: (e) => e.preventDefault(),
         keydown: (e) => {
           if (e.key === " " || e.key === "Enter") { e.preventDefault(); set(true); }
         },
@@ -761,10 +796,6 @@ createApp({
       };
     },
 
-    setAuthView(v) {
-      this.authView = v;
-      this.authError = "";
-    },
     setAuthMode(m) {
       this.authMode = m;
       this.authError = "";
@@ -774,15 +805,18 @@ createApp({
       this.adminPage = "overview";
       this.loginForm = { email: "", password: "" };
       this.signupForm = blankSignup();
-      this.adminForm = { email: "", password: "" };
       this.authError = "";
       window.scrollTo({ top: 0 });
       this.notify(`Welcome, ${this.resident.first_name || "back"}`);
     },
-    async doLogin(email, password, expected) {
+    // One "Account Log in" for everyone: The role that comes back from /auth/me decides
+    //                                    Which view opens (resident or admin/staff), so there is no account type to pick anymore.
+    async loginAccount() {
       this.authError = "";
       try {
-        api.setTokens(await api.post("/auth/login", { email: email.trim(), password }));
+        api.setTokens(
+          await api.post("/auth/login", { email: this.loginForm.email.trim(), password: this.loginForm.password }),
+        );
         await this.loadSession();
       } catch (e) {
         api.clearTokens();
@@ -790,24 +824,48 @@ createApp({
         this.authError = e.message;
         return;
       }
-      if (expected === "admin" && this.role !== "admin") {
-        this.logout();
-        this.authView = "admin";
-        this.authError = "This account doesn't have admin access.";
+      if (this.mustChange) {
+        this.loginForm = { email: "", password: "" };
+        this.changeForm = blankChange();
+        this.changeError = "";
+        window.scrollTo({ top: 0 });
         return;
       }
       await this.afterLogin();
     },
-    loginResident() {
-      return this.doLogin(this.loginForm.email, this.loginForm.password, "resident");
-    },
-    loginAdmin() {
-      return this.doLogin(this.adminForm.email, this.adminForm.password, "admin");
+    // Change Password: the temporary password first, then the new password twice (same rules as the sign up)
+    async changePassword() {
+      const f = this.changeForm;
+      this.changeError = "";
+      if (f.next.length < MIN_PASSWORD) {
+        this.changeError = `Use a password with at least ${MIN_PASSWORD} characters.`;
+        return;
+      }
+      if (f.next !== f.confirm) {
+        this.changeError = "The two new passwords do not match.";
+        return;
+      }
+      if (f.next === f.current) {
+        this.changeError = "Your new password must be different from the temporary password.";
+        return;
+      }
+      this.changeBusy = true;
+      try {
+        api.setTokens(await api.post("/auth/change-password", { current_password: f.current, new_password: f.next }));
+        await this.loadSession();
+      } catch (e) {
+        this.changeError = e.message;
+        return;
+      } finally {
+        this.changeBusy = false;
+      }
+      this.changeForm = blankChange();
+      await this.afterLogin();
     },
     async signUpResident() {
       const f = this.signupForm;
-      if (f.password.length < 6) {
-        this.authError = "Use a password with at least 6 characters.";
+      if (f.password.length < MIN_PASSWORD) {
+        this.authError = `Use a password with at least ${MIN_PASSWORD} characters.`;
         return;
       }
       if (f.password !== f.confirm) {
@@ -834,7 +892,6 @@ createApp({
       await this.afterLogin();
     },
     logout() {
-      const wasAdmin = this.role === "admin";
       api.clearTokens();
       this.me = null;
       this.resident = blankResident();
@@ -867,6 +924,18 @@ createApp({
       this.accountDialog = null;
       this.accountError = "";
       this.appealText = "";
+      this.changeForm = blankChange();
+      this.changeError = "";
+      clearTimeout(this.modTimer);
+      this.modTab = "staff";
+      this.modSearch = "";
+      this.modList = [];
+      this.modTotal = 0;
+      this.modDialog = null;
+      this.modError = "";
+      this.createDialog = null;
+      this.createError = "";
+      this.copied = false;
       this.warningAck = false;
       this.annTypeFilter = "All";
       this.deletingId = "";
@@ -874,15 +943,13 @@ createApp({
       this.reportSelected = [];
       this.page = "home";
       this.adminPage = "overview";
-      this.authView = wasAdmin ? "admin" : "resident";
       this.authMode = "login";
       this.authError = "";
       window.scrollTo({ top: 0 });
     },
 
-    // Residents Document:
-    // Putting the location back to the resident's own barangay and locking it again.
-    // Used every time the page opens, and by "Use my barangay".
+    // Residents Document: Putting the location back to the resident's own barangay and locking it again.
+    //                     Used every time the page opens, and by "Use my barangay".
     async lockDocLocation() {
       this.docLocationUnlocked = false;
       this.locationWarn = false;
@@ -1192,6 +1259,149 @@ createApp({
         this.notify(next ? "Resident marked verified" : "Verification revoked");
       } catch (e) {
         this.notify(e.message);
+      }
+    },
+    /* account modification (super admin lng) */
+    queueModLoad(delay) {
+      clearTimeout(this.modTimer);
+      this.modTimer = setTimeout(() => this.loadModAccounts(), delay);
+    },
+    async loadModAccounts() {
+      if (!this.isSuper) return;
+      const seq = ++this.modSeq; // a newer search always wins over an older, slower one
+      this.modLoading = true;
+      try {
+        const q = new URLSearchParams({ kind: this.modTab === "residents" ? "resident" : "staff" });
+        if (this.modSearch.trim()) q.set("search", this.modSearch.trim());
+        const res = await api.get(`/super/accounts?${q}`);
+        if (seq !== this.modSeq) return;
+        this.modList = res.accounts;
+        this.modTotal = res.total;
+      } catch (e) {
+        if (seq === this.modSeq) this.notify(e.message);
+      } finally {
+        if (seq === this.modSeq) this.modLoading = false;
+      }
+    },
+    openModDialog(mode, account) {
+      if (!this.isSuper) return;
+      this.modDialog = {
+        mode,
+        kind: this.modTab === "staff" ? "staff" : "resident",
+        account,
+        ack: false,
+        busy: false,
+        done: false,
+        temp: "",
+      };
+      this.modError = "";
+    },
+    closeModDialog() {
+      this.modDialog = null;
+      this.copied = false;
+      this.modError = "";
+    },
+    async confirmModDialog() {
+      const d = this.modDialog;
+      if (!d || !this.isSuper || d.done || d.busy) return;
+      if (!d.ack) {
+        this.modError = "Please tick the box to confirm you understand.";
+        return;
+      }
+      d.busy = true;
+      try {
+        if (d.mode === "reset") {
+          const res = await api.post(`/super/accounts/${d.account.id}/reset-password`);
+          d.temp = res.temp_password;
+          d.done = true;
+          this.modError = "";
+          this.notify("Password reset");
+        } else {
+          await api.del(`/super/accounts/${d.account.id}`);
+          this.modList = this.modList.filter((a) => a.id !== d.account.id);
+          this.modTotal = Math.max(0, this.modTotal - 1);
+          this.profiles = this.profiles.filter((p) => p.id !== d.account.id);
+          this.closeModDialog();
+          this.notify("Account deleted");
+        }
+      } catch (e) {
+        this.modError = e.message;
+      } finally {
+        d.busy = false;
+      }
+    },
+    /* copy da default password after ma factory reset */
+    copyText(text) {
+      if (!text) return;
+      const done = () => {
+        this.copied = true;
+        clearTimeout(this.copyTimer);
+        this.copyTimer = setTimeout(() => (this.copied = false), 2000);
+      };
+      const fallback = () => {
+        const t = document.createElement("textarea");
+        t.value = text;
+        t.setAttribute("readonly", "");
+        t.style.position = "fixed";
+        t.style.opacity = "0";
+        document.body.appendChild(t);
+        t.select();
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(t);
+        if (ok) done();
+        else this.notify("Couldn't copy. Select the text and copy it manually.");
+      };
+      if (navigator.clipboard && window.isSecureContext)
+        navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    },
+    /* create admin/staff account (super admin lng) */
+    openCreateDialog() {
+      if (!this.isSuper) return;
+      this.createDialog = {
+        first_name: "",
+        last_name: "",
+        email: "",
+        brgy_id: this.me.brgy_id || "",
+        ack: false,
+        busy: false,
+        done: false,
+        name: "",
+        temp: "",
+      };
+      this.createError = "";
+    },
+    closeCreateDialog() {
+      this.createDialog = null;
+      this.createError = "";
+      this.copied = false;
+    },
+    async submitCreateAccount() {
+      const d = this.createDialog;
+      if (!d || !this.isSuper || d.done || d.busy) return;
+      if (!d.ack) {
+        this.createError = "Please tick the box to confirm you understand.";
+        return;
+      }
+      d.busy = true;
+      try {
+        const res = await api.post("/super/staff", {
+          first_name: d.first_name,
+          last_name: d.last_name,
+          email: d.email,
+          brgy_id: d.brgy_id,
+        });
+        d.name = res.account.name;
+        d.temp = res.temp_password;
+        d.done = true;
+        this.createError = "";
+        this.queueModLoad(0);
+        this.notify("Staff account created");
+      } catch (e) {
+        this.createError = e.message;
+      } finally {
+        d.busy = false;
       }
     },
     openAccountDialog(mode, profile) {

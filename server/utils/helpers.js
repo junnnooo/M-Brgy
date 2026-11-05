@@ -3,6 +3,9 @@ import { supabase } from "./supabase.js";
 export const VERIFIED = "Verified";
 export const PENDING = "Pending";
 
+// Password: 8 characters minimum (was 6). Used by signup and by the Super Admin tools.
+export const MIN_PASSWORD = 8;
+
 // HTTP: Error helper to throw an error with a status code and message. 
 //       This is used in the check function to throw errors from Supabase queries.
 export const httpError = (status, message) =>

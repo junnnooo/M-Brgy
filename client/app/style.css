@@ -2415,3 +2415,99 @@ tr.row-selected {
   gap: 10px;
   margin-top: 20px;
 }
+/* password character count */
+.char-count {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.char-count.ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+/* account modification (super admin lng to) */
+.disclaimer-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #fff3f4;
+  border-left: 6px solid var(--tape);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.disclaimer-note.caution {
+  background: #fff9e6;
+  border-left-color: var(--sign);
+}
+.disclaimer-note p { margin: 6px 0 0; }
+.reject-modal label.ack-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+}
+.ack-row input { margin-top: 4px; flex: none; }
+.account-mod .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.account-mod .row-actions .small-action {
+  flex: none;
+  min-width: max-content;
+}
+.temp-password {
+  display: block;
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--paper);
+  border: 2px dashed var(--hall);
+  font: 800 1.5rem monospace;
+  letter-spacing: 0.1em;
+  text-align: center;
+  user-select: all;
+}
+/* copy default password */
+.temp-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 12px;
+}
+.temp-row .temp-password {
+  flex: 1;
+  margin: 0;
+}
+.temp-row .btn {
+  min-width: 96px;
+}
+/* create admin/staff account (super admin lng) */
+.create-account-btn {
+  flex: none;
+  white-space: nowrap;
+}
+.create-modal {
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.reject-modal input[type="text"],
+.reject-modal input[type="email"],
+.reject-modal select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: var(--white);
+  border: 2px solid var(--field);
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 400;
+}
+.reject-modal input[type="text"]:focus,
+.reject-modal input[type="email"]:focus,
+.reject-modal select:focus {
+  outline: 3px solid var(--sign);
+  border-color: var(--hall);
+}
+.create-modal label.ack-row { font-weight: 400; }

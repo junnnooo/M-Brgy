@@ -1,13 +1,14 @@
 import "dotenv/config";
 import { supabase } from "../utils/supabase.js";
+import { MIN_PASSWORD } from "../utils/helpers.js";
 
 // Parse Command Line: Arguments for email, password, first name, last name, 
-//                     barangay ID (10-digit PSGC code), and optional role ID (defaulting to 3 for Admin)
+//                     barangay ID (10-digit PSGC code), and optional role ID (defaulting to 3 for Admin = Super Admin)
 const [email, password, firstName, lastName, brgyId, roleId = "3"] = process.argv.slice(2);
 
 // Simple Logic: If any required argument is missing, print usage instructions and exit with an error code.
 if (!email || !password || !firstName || !lastName || !brgyId) {
-  console.error("Usage: node scripts/create-admin.js <email> <password> <first name> <last name> <brgy_id (10-digit PSGC code)> [role_id: 2=Staff, 3=Admin]");
+  console.error("Usage: node scripts/create-admin.js <email> <password> <first name> <last name> <brgy_id (10-digit PSGC code)> [role_id: 2=Staff, 3=Admin (Super Admin)]");
   process.exit(1);
 }
 
@@ -15,6 +16,12 @@ if (!email || !password || !firstName || !lastName || !brgyId) {
 //             Keep it as a string; never convert it with Number().
 if (!/^[0-9]{10}$/.test(brgyId)) {
   console.error("brgy_id must be the 10-digit PSGC code, e.g. 0402104012");
+  process.exit(1);
+}
+
+// Validation: the password needs at least 8 characters (same as the sign up).
+if (password.length < MIN_PASSWORD) {
+  console.error(`The password needs at least ${MIN_PASSWORD} characters.`);
   process.exit(1);
 }
 
@@ -61,4 +68,4 @@ if (profileError) {
 
 // Success: Log a message indicating that the account was created successfully,
 //          specifying whether it is an admin or staff account based on the role ID.
-console.log(`Created ${roleId === "2" ? "staff" : "admin"} account for ${email}`);
+console.log(`Created ${roleId === "2" ? "staff" : "super admin"} account for ${email}`);
