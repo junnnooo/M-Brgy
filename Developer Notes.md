@@ -10,10 +10,21 @@ This will serve as a guide for other developers!
 
     (+) Added the Change Password screen, an account on a temporary password (must_change_password = true) has to change it before anything else opens
     (+) Added POST /api/auth/change-password (temporary password first, then the new password, 8 characters minimum)
+    (+) Added 4 database tools for deleted accounts (server/scripts/maintenance-deleted-accounts.sql), nothing else is needed:
+        >   list_deleted_accounts() to see them and which tool fits each one
+        >   purge_deleted_logins(id optional) closes the login of one or all deleted accounts, the server runs it after every delete
+        >   remove_deleted_accounts(id optional, 'REMOVE') removes the account row and login, an account that records point to is KEPT, 
+                a rehearsal unless you type REMOVE
+        >   wipe_deleted_account(id, 'WIPE EVERYTHING') full wipe of ONE account: its requests, reports and report updates are deleted,
+                records of other people only lose its name, a rehearsal unless you type the words
 
     (~) Reset Password by the Super Admin now flags residents too, not only staff
     (~) Until the password is changed the server only answers /auth/me and /auth/change-password for that account
+    (~) Delete Account now keeps the person's name for the records, the email becomes "Deleted Account", address and contact are still cleared
+    (~) Every removal is all or nothing and goes to maintenance.deletion_log (ids and reference numbers only), the tools can only be run from the SQL Editor
+    (~) accounts.email is only unique for active accounts, and accounts_account_id_fkey was removed so a deleted account can stay in the records without its login
     (~) style.css, api.js and app.js are loaded with a version tag (?v=3.0.0-c) so the browser never keeps an old copy, change the tag on every update
+
 
 ## Version: 3.0.0-b (MAJOR OVERHAUL UPDATE PART 2)
 

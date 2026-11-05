@@ -12,6 +12,9 @@ const RESIDENT_ROLE_ID = 1;
 const STAFF_ROLE_ID = 2;
 const LIMIT = 100;
 const BAN_FOREVER = "876000h"; // about 100 years: a deleted login can never be used again
+// What the accounts table shows as the email of a deleted account. The database function
+// purge_deleted_logins() looks for it, so a deleted login can be removed from the auth table.
+const DELETED_EMAIL = "Deleted Account";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Password: temporary one, no look-alike characters (I, l, O, 0, 1)
@@ -39,6 +42,7 @@ const cleanSearch = (value) =>
 // Barangay scope: the Owner can touch any barangay, a Super Admin only their own
 const inScope = (req, brgyId) => req.isAdmin || (Boolean(req.account.brgy_id) && req.account.brgy_id === brgyId);
 
+// A resident or staff account of this barangay that is not deleted, or a 404. Super Admins and the Owner can't be touched here.
 async function targetFor(req) {
   const id = String(req.params.id);
   if (!UUID.test(id)) throw httpError(404, "Account not found.");
@@ -131,13 +135,13 @@ router.post("/staff", requireAuth, requireSuper, async (req, res) => {
     .select(LIST_COLUMNS)
     .single();
   if (profileError) {
-    await supabase.auth.admin.deleteUser(data.user.id);
+    await supabase.auth.admin.deleteUser(data.user.id); // don't leave a login with no profile
     throw httpError(400, `Couldn't create the account: ${profileError.message}`);
   }
   res.status(201).json({ account: toRow(row), temp_password: password });
 });
 
-// Temporary reset password: The old password stops working right away. The new one is returned once,
+// Temporary reset password: the old password stops working right away. The new one is returned once,
 //                           and the account has to change it at the next log in (must_change_password).
 router.post("/accounts/:id/reset-password", requireAuth, requireSuper, async (req, res) => {
   const account = await targetFor(req);
@@ -159,9 +163,10 @@ router.post("/accounts/:id/reset-password", requireAuth, requireSuper, async (re
   res.json({ temp_password: password });
 });
 
-// Delete account: The login is closed and the email is freed (the person can sign up again), the profile and
-//                 the private records are wiped. The row itself stays, named "Deleted account", so the requests, reports and
-//                 updates that point to it stay in the barangay records.
+// Delete account: the login is closed and the email is freed (the person can sign up again), the address,
+//                 contact and the private records are wiped. The row itself stays with the person's name (for the records) and
+//                 the email "Deleted Account", so the requests, reports and updates that point to it stay in the barangay records.
+//                 The closed login is then removed from the auth table by the database function purge_deleted_logins().
 router.delete("/accounts/:id", requireAuth, requireSuper, async (req, res) => {
   const account = await targetFor(req);
   const id = account.account_id;
@@ -178,10 +183,7 @@ router.delete("/accounts/:id", requireAuth, requireSuper, async (req, res) => {
     await supabase
       .from("accounts")
       .update({
-        first_name: "Deleted",
-        middle_name: null,
-        last_name: "account",
-        email: placeholder,
+        email: DELETED_EMAIL, // the name stays for the records, the email is what marks the row as deleted
         address: "",
         contact_number: "",
         deleted_at: new Date().toISOString(),
@@ -194,6 +196,12 @@ router.delete("/accounts/:id", requireAuth, requireSuper, async (req, res) => {
   check(await supabase.from("account_appeals").delete().eq("account_id", id));
 
   invalidateAccount(id);
+
+  // Remove the closed logins from the auth table. Best effort: the account is already blocked, so if the
+  // function isn't installed yet (or fails) the banned login just stays until the next run.
+  const { error: purgeError } = await supabase.rpc("purge_deleted_logins");
+  if (purgeError) console.error("purge_deleted_logins:", purgeError.message);
+
   res.status(204).end();
 });
 
