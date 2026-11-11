@@ -2511,3 +2511,834 @@ tr.row-selected {
   border-color: var(--hall);
 }
 .create-modal label.ack-row { font-weight: 400; }
+/* warning history */
+.warn-pill {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.warn-pill:hover,
+.warn-pill:focus-visible {
+  text-decoration: underline;
+  filter: brightness(0.95);
+}
+.warn-history {
+  display: grid;
+  gap: 10px;
+  max-height: 340px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.warn-history li {
+  padding: 12px 14px;
+  background: var(--paper);
+  border-left: 6px solid var(--tape);
+}
+.warn-history li.cleared {
+  border-left-color: var(--ok);
+  opacity: 0.85;
+}
+.warn-history p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.warn-meta {
+  font-size: 0.9rem;
+}
+.warn-meta .status-pill {
+  margin-left: 6px;
+}
+.warn-history li.lifted {
+  border-left-color: var(--muted);
+}
+.warn-link {
+  margin-left: 8px;
+  font-size: 0.82rem;
+}
+.warn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.warn-actions.confirm span {
+  flex: 1 1 100%;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+/* full resident details: the ">" at the far right of a resident row, and the page it opens */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.arrow-col {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+.row-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--white);
+  color: var(--hall);
+  border: 2px solid var(--field);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.row-arrow:hover,
+.row-arrow:focus-visible {
+  background: var(--hall);
+  border-color: var(--hall);
+  color: var(--white);
+}
+.back-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--hall);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.back-link:hover,
+.back-link:focus-visible {
+  text-decoration: underline;
+}
+/* ---- resident details: object page (header summary + tabs + read-only field cards) ---- */
+.resident-page {
+  padding: 0;
+  overflow: hidden;
+}
+.obj-crumb {
+  padding: 16px clamp(16px, 3vw, 28px) 0;
+}
+.obj-crumb .back-link {
+  margin: 0;
+}
+.obj-pad {
+  margin: 20px clamp(16px, 3vw, 28px);
+}
+.obj-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 20px clamp(20px, 4vw, 48px);
+  align-items: center;
+  padding: 18px clamp(16px, 3vw, 28px) 22px;
+}
+.obj-id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.resident-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  background: var(--sign);
+  border-radius: 50%;
+  color: var(--ink);
+  font: 800 1.9rem var(--display);
+}
+.obj-id-text {
+  min-width: 0;
+}
+.obj-id-text h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  overflow-wrap: anywhere;
+}
+.obj-sub {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.obj-sub a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+.obj-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.obj-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding-left: clamp(0px, 3vw, 32px);
+  border-left: 1px solid var(--line);
+}
+.fact dt,
+.field dt {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.fact dd,
+.field dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fact dd {
+  font-weight: 700;
+  line-height: 1.35;
+}
+.fact dd a {
+  color: var(--hall);
+  text-underline-offset: 3px;
+}
+.fact dd small,
+.field dd small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+.field dd small {
+  display: inline;
+  margin-left: 6px;
+}
+.is-empty {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400 !important;
+}
+
+/* tabs */
+.obj-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 clamp(8px, 2vw, 20px);
+  border-bottom: 2px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.obj-tabs::-webkit-scrollbar {
+  display: none;
+}
+.obj-tabs button {
+  white-space: nowrap;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: -2px;
+  background: none;
+  border: 0;
+  border-bottom: 4px solid transparent;
+  font-weight: 700;
+  color: var(--muted);
+}
+.obj-tabs button:hover {
+  color: var(--hall);
+}
+.obj-tabs button.active {
+  color: var(--hall);
+  border-bottom-color: var(--sign);
+}
+.tab-count {
+  min-width: 20px;
+  padding: 0 6px;
+  background: var(--tape);
+  color: var(--white);
+  border-radius: 10px;
+  font: 700 0.75rem/1.55 var(--display);
+  font-style: normal;
+  text-align: center;
+}
+
+/* body */
+.obj-body {
+  padding: clamp(14px, 2.5vw, 24px);
+  background: var(--paper);
+}
+.obj-section {
+  margin-bottom: 18px;
+  padding: clamp(16px, 2.4vw, 22px);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--hall);
+  border-radius: 2px;
+}
+.obj-section:last-child {
+  margin-bottom: 0;
+}
+.obj-section > h3 {
+  margin-bottom: 16px;
+  font-size: 1.15rem;
+}
+.obj-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+}
+.obj-section-head h3 {
+  font-size: 1.15rem;
+}
+.obj-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 18px 28px;
+  margin: 0;
+}
+.field {
+  min-width: 0;
+}
+.field-wide {
+  grid-column: 1 / -1;
+}
+.field dd {
+  font-size: 1.02rem;
+}
+.field code {
+  font-size: 0.9rem;
+  user-select: all;
+}
+
+/* warnings meter */
+.warn-meter {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.warn-meter-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.warn-meter-count b {
+  font: 800 2.4rem/1 var(--display);
+  color: var(--ok);
+}
+.warn-meter.danger .warn-meter-count b {
+  color: var(--tape);
+}
+.warn-meter-count span {
+  color: var(--muted);
+}
+.warn-meter-bar {
+  display: flex;
+  flex: 1 1 160px;
+  gap: 6px;
+  max-width: 320px;
+}
+.warn-meter-bar span {
+  flex: 1;
+  height: 10px;
+  background: var(--line);
+  border-radius: 2px;
+}
+.warn-meter-bar span.on {
+  background: var(--tape);
+}
+
+/* activity tiles */
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+.stat-tile {
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--sign);
+}
+.stat-tile b {
+  display: block;
+  font: 800 2.2rem/1.1 var(--display);
+  color: var(--hall);
+}
+.stat-tile span {
+  color: var(--muted);
+}
+.obj-appeal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.detail-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* tablet */
+@media (max-width: 1024px) {
+  .obj-head {
+    grid-template-columns: 1fr;
+  }
+  .obj-facts {
+    padding-left: 0;
+    padding-top: 18px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+/* phone */
+@media (max-width: 560px) {
+  .resident-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 1.5rem;
+  }
+  .obj-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .field-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .obj-tabs {
+    padding: 0 4px;
+  }
+  .obj-tabs button {
+    padding: 12px;
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+  .obj-actions {
+    width: 100%;
+  }
+  .obj-actions .small-action {
+    flex: 1 1 140px;
+    padding: 10px 12px;
+  }
+}
+
+/* ---- admin sidebar: grouped sections (plain labels, no collapsing, so every badge stays visible) ---- */
+.nav-label {
+  margin: 16px 12px 4px;
+  padding: 0;
+  color: #9fb3e0;
+  font: 700 0.72rem/1.2 var(--display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.admin-sidebar > .sidebar-toggle + button {
+  margin-top: 8px;
+}
+.admin-sidebar > button.active[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.12);
+}
+/* pin button */
+.pin-icon {
+  flex: none;
+  transition: transform 0.2s ease, fill 0.2s ease;
+  transform: rotate(45deg); /* un-pinned: tilted, line art */
+}
+.pin-btn.pinned .pin-icon {
+  transform: rotate(0);
+  fill: currentColor; /* pinned: upright and filled */
+  color: var(--sign);
+}
+.pin-btn .pin-icon {
+  margin: 0 3px;
+}
+
+/* Desktop: an un-pinned panel rests as an icon rail. It opens over the page while you use it, so the
+   page never jumps around. Pinning/un-pinning resizes the page to match.
+   Every row, label and icon keeps the SAME size and position in both states: only the width changes,
+   so nothing shifts up/down or sideways when the panel opens and closes. */
+@media (min-width: 961px) {
+  .admin-layout {
+    grid-template-columns: 264px 1fr;
+    transition: grid-template-columns 0.25s ease;
+  }
+  .admin-layout.collapsed {
+    grid-template-columns: 76px 1fr;
+  }
+  /* fixed row height (room for a two-line label) so wrapped and single-line rows are equally tall */
+  .admin-sidebar > button {
+    box-sizing: border-box;
+    flex: none;
+    width: 236px; /* = open width (264) minus sidebar padding: text lays out once and never re-wraps */
+    height: 56px;
+    padding-block: 6px;
+    line-height: 1.2;
+  }
+  /* fixed to the screen's height and stuck under the header: only the main area scrolls */
+  .admin-sidebar {
+    position: sticky;
+    top: var(--header-h, 78px);
+    z-index: 45;
+    align-self: start;
+    height: calc(100vh - var(--header-h, 78px));
+    height: calc(100dvh - var(--header-h, 78px));
+    overflow-x: hidden; /* the panel only reveals / clips the content as it grows or shrinks */
+    overflow-y: auto; /* a very short screen can still reach every item */
+    scrollbar-width: none; /* no scrollbar, so the rail's width never changes */
+  }
+  .admin-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+  .admin-sidebar > button > span {
+    min-width: 0;
+  }
+  .admin-sidebar > .sidebar-toggle + button {
+    margin-top: 8px;
+  }
+  /* group label: fixed box; in the rail the text is hidden and a line is drawn in the same box */
+  .nav-label {
+    height: 14px;
+    margin: 16px 12px 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+  .official-avatar {
+    flex: none; /* never squeezed, whatever the panel width */
+    min-width: 40px;
+  }
+  .sidebar-bottom {
+    position: sticky; /* on a short screen the menu scrolls, the profile stays in view */
+    bottom: 0;
+    z-index: 1;
+    background: var(--hall-deep);
+    box-sizing: border-box;
+    min-height: 73px; /* same height with or without the name text, so the avatar never shifts */
+    padding-left: 4px; /* avatar sits in the same column as the icons */
+  }
+  .pin-btn .pin-icon {
+    margin: 0 -1px;
+  }
+
+  .admin-layout.collapsed .admin-sidebar {
+    width: 76px;
+    transition: width 0.25s ease, box-shadow 0.25s ease;
+  }
+  .admin-layout.collapsed.peek .admin-sidebar {
+    width: 264px;
+    box-shadow: 8px 0 24px -8px rgba(11, 31, 77, 0.55);
+  }
+  /* rail: icons only, still in the same spot */
+  .admin-layout.collapsed:not(.peek) .admin-sidebar > button {
+    position: relative;
+  }
+  .admin-sidebar > button > span {
+    transition: opacity 0.2s ease 0.06s;
+  }
+  .admin-layout.collapsed:not(.peek) .admin-sidebar > button > span {
+    opacity: 0;
+    transition-delay: 0s;
+    pointer-events: none;
+  }
+  /* badges stay visible as small dots on the icon, so pending work is never hidden.
+     The badge keeps its place in the row (so the label never re-wraps); it is only moved + shrunk visually. */
+  .admin-sidebar > button > i {
+    transform-origin: right center;
+    transition: transform 0.25s ease, color 0.15s ease, opacity 0.15s ease;
+  }
+  .admin-layout.collapsed:not(.peek) .admin-sidebar > button > i {
+    transform: translate(-180px, -15px) scale(0.45);
+    color: transparent;
+    box-shadow: 0 0 0 3px var(--hall-deep);
+  }
+  .admin-layout.collapsed:not(.peek) .admin-sidebar > button > i.zero {
+    opacity: 0; /* nothing pending: no dot on the rail */
+  }
+  .admin-layout.collapsed:not(.peek) .nav-label {
+    color: transparent;
+    background: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22)) center / 100% 1px no-repeat;
+  }
+  .sidebar-bottom > div:not(.official-avatar) {
+    flex: none;
+    width: 170px;
+    white-space: nowrap;
+    transition: opacity 0.2s ease 0.06s;
+  }
+  .admin-layout.collapsed:not(.peek) .sidebar-bottom > div:not(.official-avatar) {
+    opacity: 0;
+    transition-delay: 0s;
+  }
+  .admin-layout.collapsed:not(.peek) .sidebar-bottom {
+    padding-right: 0; /* the rail is narrow: give the avatar all the room it needs */
+  }
+}
+
+/* tablet/phone: the sidebar is a scrolling strip, so labels become small vertical dividers */
+@media (max-width: 960px) {
+  .pin-btn {
+    display: none;
+  }
+  .nav-label {
+    flex: none;
+    align-self: stretch;
+    width: 1px;
+    height: auto;
+    margin: 6px 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.25);
+    font-size: 0;
+  }
+}
+
+/* ---- resident details: quick actions (header) + "More actions" tab ---- */
+.obj-quick {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.obj-quick-label {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+/* every quick action is the same size, whichever button style it uses */
+.obj-quick .btn,
+.obj-quick .small-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 20px;
+  border-width: 2px;
+  border-radius: 4px;
+  font: 700 1rem/1.2 var(--display);
+  font-stretch: 108%;
+}
+.obj-quick-more {
+  margin-left: auto;
+}
+.action-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.action-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.action-list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.action-list li:last-child {
+  padding-bottom: 0;
+}
+.action-list li > div {
+  min-width: 0;
+}
+.action-list b {
+  display: block;
+}
+.action-list p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.action-list .small-action {
+  flex: none;
+}
+.obj-section.danger-zone {
+  border-top-color: var(--tape);
+}
+.danger-zone > h3 {
+  color: #8e1625;
+}
+@media (max-width: 560px) {
+  .obj-quick .btn,
+  .obj-quick .small-action {
+    flex: 1 1 150px;
+  }
+  .obj-quick-label,
+  .obj-quick-more {
+    flex-basis: 100%;
+    margin: 0;
+  }
+  .obj-quick-more {
+    text-align: left;
+  }
+  .action-list li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .action-list .small-action {
+    padding: 10px 12px;
+  }
+}
+
+/* resident list: the pending-only "Mark verified" quick action sits next to the details arrow */
+.row-end {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.row-end .small-action {
+  background: var(--sign);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.row-end .small-action:hover {
+  background: var(--hall);
+  border-color: var(--hall);
+  color: var(--white);
+}
+
+/* ---- Staff details: Access tab ---- */
+.access-intro {
+  margin: 0 0 14px;
+  max-width: 62ch;
+}
+.access-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.access-bar .small-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.access-bar .small-action:disabled:hover {
+  background: transparent;
+  color: var(--hall);
+}
+.access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+.access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+.access-row + .access-row {
+  border-top: 1px solid var(--line);
+}
+.access-row > div {
+  min-width: 0;
+}
+.access-row b,
+.access-row small {
+  display: block;
+}
+.access-row small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+.switch {
+  flex: none;
+  position: relative;
+  width: 48px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--field);
+  border-radius: 999px;
+  background: var(--field);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--white);
+  transition: transform 0.18s ease;
+}
+.switch.on {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.switch.on .switch-knob {
+  transform: translateX(20px);
+}
+.switch:focus-visible {
+  outline: 3px solid var(--sign);
+  outline-offset: 2px;
+}
+.access-warn {
+  margin: 12px 0 0;
+}
+.access-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.access-save .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.no-access {
+  padding: 28px 24px;
+  text-align: left;
+}
+.no-access p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch-knob {
+    transition: none;
+  }
+}
+
+/* ---- account modification list: short description under the Access pill ---- */
+.access-cell .access-note {
+  display: block;
+  margin-top: 4px;
+  max-width: 280px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.3;
+}

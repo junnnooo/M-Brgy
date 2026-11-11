@@ -4,7 +4,7 @@ import {
   canTouchBarangay, check, formatTime, fullName, httpError, numericId, parseRef,
   PERSON_COLUMNS, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
-import { requireActiveAccount, requireAuth, requireStaff } from "../middleware/auth.js";
+import { requireActiveAccount, requireAuth, requireSection, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 import { LIVE_REQUEST_STATUSES, MAX_ACTIVE, docLimitFor } from "./moderation.js";
 
@@ -54,7 +54,7 @@ router.get("/mine", requireAuth, async (req, res) => {
 });
 
 // Staff: everything in their barangay
-router.get("/", requireAuth, requireStaff, async (req, res) => {
+router.get("/", requireAuth, requireStaff, requireSection("requests"), async (req, res) => {
   const query = scopeToBarangay(
     supabase.from("requests").select(SELECT).order("created_at", { ascending: false }),
     req.account,
@@ -74,7 +74,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   const allowed =
     request &&
     (request.submitted_by === req.account.account_id ||
-      (req.isStaff && canTouchBarangay(req.account, request.brgy_id)));
+      (req.isStaff && req.sections.includes("requests") && canTouchBarangay(req.account, request.brgy_id)));
   if (!allowed) throw httpError(404, "Request not found.");
   res.json(toRequest(request));
 });
@@ -151,7 +151,7 @@ router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
 
 // Staff: change a request's status. Rejecting requires a reason (min 5 characters), stored in
 //        requests.rejection_reason and cleared again if the request later moves to another status.
-router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
+router.patch("/:id/status", requireAuth, requireStaff, requireSection("requests"), async (req, res) => {
   const id = numericId(req.params.id, "Request");
   const { status, reason } = req.body ?? {};
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
@@ -195,7 +195,7 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
 });
 
 // Staff: move a request out of the active list (or back). Needs requests.archived_at (1.0.3 migration).
-router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+router.patch("/:id/archive", requireAuth, requireStaff, requireSection("requests"), async (req, res) => {
   const id = numericId(req.params.id, "Request");
   const { archived } = req.body ?? {};
   if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");

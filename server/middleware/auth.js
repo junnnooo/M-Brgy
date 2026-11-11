@@ -8,6 +8,24 @@ export const STAFF_WEIGHT = 50;
 export const SUPER_WEIGHT = 75;
 export const ADMIN_WEIGHT = 100;
 
+// The sections of the staff panel that a Super Admin can switch on or off for each Staff account.
+// "announcements" also covers the emergency alerts. "settings" only shows or hides the page: the barangay
+// settings can still only be saved by the Owner (see routes/barangays.js).
+export const SECTIONS = ["residents", "requests", "reports", "announcements", "settings"];
+
+// accounts.permissions is a text[] column. NULL (the default for every existing Staff account) = every section,
+// including any section added later. An array = only the sections listed in it.
+export const staffSections = (permissions) =>
+  Array.isArray(permissions) ? SECTIONS.filter((s) => permissions.includes(s)) : [...SECTIONS];
+
+// Which sections this account may use. Residents: none. Super Admin and Owner: all (always).
+export function sectionsOf(account) {
+  const weight = account?.roles?.weight ?? 0;
+  if (weight < STAFF_WEIGHT) return [];
+  if (weight >= SUPER_WEIGHT) return [...SECTIONS];
+  return staffSections(account.permissions);
+}
+
 export const ACCOUNT_SELECT =
   "*, roles(role_name, weight), barangays(brgy_name, address, office_hours)";
 const TOKEN_TTL_MS = 60 * 1000;
@@ -125,6 +143,7 @@ export async function requireAuth(req, res, next) {
   req.isAdmin = weight >= ADMIN_WEIGHT;
   req.isSuper = weight >= SUPER_WEIGHT;
   req.isDeactivated = !req.isStaff && Boolean(account.deactivated_at);
+  req.sections = sectionsOf(account);
   next();
 }
 
@@ -132,6 +151,14 @@ export function requireStaff(req, res, next) {
   if (!req.isStaff) throw httpError(403, "Barangay staff access only.");
   next();
 }
+
+// Use after requireAuth and requireStaff: lets a Staff account in only if the Super Admin switched this section on.
+export const requireSection = (section) => (req, res, next) => {
+  if (!req.sections?.includes(section)) {
+    throw httpError(403, "You don't have access to this section. Ask your Super Admin.");
+  }
+  next();
+};
 
 export function requireSuper(req, res, next) {
   if (!req.isSuper) throw httpError(403, "Super Admin access only.");

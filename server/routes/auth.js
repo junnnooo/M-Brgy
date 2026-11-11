@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase, createAuthClient } from "../utils/supabase.js";
 import { check, httpError, MIN_PASSWORD, PENDING, VERIFIED } from "../utils/helpers.js";
-import { ACCOUNT_SELECT, ADMIN_WEIGHT, STAFF_WEIGHT, SUPER_WEIGHT, invalidateAccount, requireAuth } from "../middleware/auth.js";
+import { ACCOUNT_SELECT, ADMIN_WEIGHT, STAFF_WEIGHT, SUPER_WEIGHT, invalidateAccount, requireAuth, sectionsOf } from "../middleware/auth.js";
 import { standingFields, standingOf } from "./moderation.js";
 
 const router = Router();
@@ -23,6 +23,7 @@ export const toMe = (a) => ({
   is_super: (a.roles?.weight ?? 0) >= SUPER_WEIGHT,
   is_owner: (a.roles?.weight ?? 0) >= ADMIN_WEIGHT,
   must_change_password: Boolean(a.must_change_password),
+  sections: sectionsOf(a), // the staff-panel sections this account may open (the app hides the rest)
 });
 
 // toMe + the account's moderation standing (deactivation, active warnings, latest appeal)

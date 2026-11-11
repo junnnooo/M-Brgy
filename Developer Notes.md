@@ -6,6 +6,42 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 3.0.0-e (MAJOR OVERHAUL UPDATE PART 5)
+
+    (~) Huge Changes in client/app/index.html, client/app/api.js, client/app/app.js, client/app/sytle.css to accomodate new changes in the Admin Panel
+    (~) Revamped the Sidebar Navigation in Admin Panel
+    (~) Renamed Resident Verification to Resident Accounts
+    (+) Super Admin Can Now Create Admins With Specific Access To Specific Sections Of The Admin Table
+    (+) Added a Resident Details In Resident Account
+
+
+## Version: 3.0.0-d (MAJOR OVERHAUL UPDATE PART 4)
+Task 4 of the port, done in sections: 
+    1. Warning history, 
+    2. Delete warning, 
+    3. Full resident details.
+
+    Section 1: Warning history
+    (+) Added Warning history (Staff and Super Admin): the Warnings pill of a resident opens the whole history, the active warnings and the ones cleared when the account was reactivated, with the date, the reason and who sent it
+    (+) Added GET /api/accounts/:id/warnings (own barangay only)
+    (+) Added a Warning history button on the Deactivated accounts list
+
+    Section 2: Lift warning and delete from the history
+    (~) The Warnings pill (0/3) now opens only the CURRENT warnings, the History link opens ALL of them (a "View full history" button is in the current view)
+    (+) Added Lift (Staff and Super Admin) on an active warning: it stays in the history as "Lifted" with who and when, it stops counting toward the 3 and the resident is notified
+    (+) Added Delete on a warning that is Lifted or Cleared: it is removed from the history for good, an active warning cannot be deleted (lift it first)
+    (+) Added POST /api/accounts/:id/warnings/:warningId/lift and DELETE /api/accounts/:id/warnings/:warningId (own barangay only)
+    (+) Added account_warnings.cleared_by and cleared_reason in the Database (values: reactivated, lifted), a reactivation marks its cleared warnings "reactivated"
+    (+) Added a History link next to the Warnings pill so the history is easier to find
+    (~) The maintenance tools know the new cleared_by link (the setup SQL file includes it)
+
+    Section 3: Full resident details
+    (+) Added a ">" arrow at the far right of every resident row (Resident verification, the Deactivated list and Account modification > Residents), it opens a new Resident details page with a Back button
+    (+) The page shows the personal details (first, middle, last name, email, contact, address), the account (barangay, verification, created, account ID), the standing (active or deactivated and why, warnings with Current warnings and Warning history buttons, appeal) and the activity (document requests and concern reports)
+    (+) Added GET /api/accounts/:id (own barangay only, Staff, Super Admin and Owner)
+    (~) An id that is not a valid id now gives "Resident not found" (404) instead of a database error, for every resident route
+    (~) Version tag is now ?v=3.0.0-d
+
 ## Version: 3.0.0-c (MAJOR OVERHAUL UPDATE PART 3)
 
     (+) Added the Change Password screen, an account on a temporary password (must_change_password = true) has to change it before anything else opens

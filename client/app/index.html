@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=3.0.0-c" />
+  <link rel="stylesheet" href="style.css?v=3.0.0-d4" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
@@ -1179,42 +1179,49 @@
 
 <!-- Admin Page -->
 
-  <main v-else-if="role==='admin'" class="admin-layout" :class="{collapsed:sidebarCollapsed}">
+  <main v-else-if="role==='admin'" class="admin-layout" :class="{collapsed:sidebarCollapsed, peek:sidebarCollapsed && sidebarPeek}">
 
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" @mouseenter="sidebarEnter" @mouseleave="sidebarLeave" @focusin="sidebarEnter" @focusout="sidebarFocusOut">
 
-      <button type="button" class="sidebar-toggle" @click="toggleSidebar" :aria-expanded="!sidebarCollapsed" :title="sidebarCollapsed?'Expand menu':'Collapse menu'">{{sidebarCollapsed?'»':'☰'}}
-        <span>Close Side Panel</span>
+      <button type="button" class="sidebar-toggle pin-btn" :class="{pinned:!sidebarCollapsed}" @click="toggleSidebar" :aria-pressed="!sidebarCollapsed" :title="sidebarCollapsed ? 'Pin the side panel open' : 'Unpin the side panel'">
+        <svg class="pin-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+        <span>{{sidebarCollapsed ? 'Pin side panel' : 'Pinned'}}</span>
       </button>
 
-      <button :class="{active:adminPage==='overview'}" title="Overview" @click="adminPage='overview'">▦ 
+      <button :class="{active:adminPage==='overview'}" :aria-current="adminPage==='overview' ? 'page' : null" title="Overview" @click="adminPage='overview'">▦ 
         <span>Overview</span>
       </button>
       
-      <button :class="{active:adminPage==='verifications'}" title="Resident verification" @click="adminPage='verifications'">✓ 
-        <span>Resident verification</span>
-        <i>{{pendingResidents.length + pendingAppeals.length}}</i>
+      <p v-if="can('residents') || isSuper" class="nav-label">Accounts</p>
+
+      <button v-if="can('residents')" :class="{active:adminPage==='verifications' || (adminPage==='resident' && residentView && residentView.from==='verifications')}" :aria-current="(adminPage==='verifications' || (adminPage==='resident' && residentView && residentView.from==='verifications')) ? 'page' : null" title="Resident Accounts" @click="adminPage='verifications'">✓ 
+        <span>Resident Accounts</span>
+        <i :class="{zero:(pendingResidents.length + pendingAppeals.length)===0}">{{pendingResidents.length + pendingAppeals.length}}</i>
       </button>
       
-      <button v-if="isSuper" :class="{active:adminPage==='accounts'}" title="Account modification" @click="adminPage='accounts'">✎ 
+      <button v-if="isSuper" :class="{active:adminPage==='accounts' || adminPage==='staff' || (adminPage==='resident' && residentView && residentView.from==='accounts')}" :aria-current="(adminPage==='accounts' || adminPage==='staff' || (adminPage==='resident' && residentView && residentView.from==='accounts')) ? 'page' : null" title="Account modification" @click="adminPage='accounts'">✎ 
         <span>Account modification</span>
       </button>
       
-      <button :class="{active:adminPage==='documents'}" title="Document requests" @click="adminPage='documents'">▤ 
+      <p v-if="can('requests') || can('reports') || can('announcements')" class="nav-label">Services</p>
+
+      <button v-if="can('requests')" :class="{active:adminPage==='documents'}" :aria-current="adminPage==='documents' ? 'page' : null" title="Document requests" @click="adminPage='documents'">▤ 
         <span>Document requests</span>
-        <i>{{pendingRequests.length}}</i>
+        <i :class="{zero:pendingRequests.length===0}">{{pendingRequests.length}}</i>
       </button>
       
-      <button :class="{active:adminPage==='reports'}" title="Concern reports" @click="adminPage='reports'">◎ 
+      <button v-if="can('reports')" :class="{active:adminPage==='reports'}" :aria-current="adminPage==='reports' ? 'page' : null" title="Concern reports" @click="adminPage='reports'">◎ 
         <span>Concern reports</span>
-        <i>{{openReports.length}}</i>
+        <i :class="{zero:openReports.length===0}">{{openReports.length}}</i>
       </button>
       
-      <button :class="{active:adminPage==='posts'}" title="Announcements" @click="adminPage='posts'">▧ 
+      <button v-if="can('announcements')" :class="{active:adminPage==='posts'}" :aria-current="adminPage==='posts' ? 'page' : null" title="Announcements" @click="adminPage='posts'">▧ 
         <span>Announcements</span>
       </button>
       
-      <button :class="{active:adminPage==='settings'}" title="Barangay settings" @click="adminPage='settings'">⚙ 
+      <p v-if="can('settings')" class="nav-label">System</p>
+
+      <button v-if="can('settings')" :class="{active:adminPage==='settings'}" :aria-current="adminPage==='settings' ? 'page' : null" title="Barangay settings" @click="adminPage='settings'">⚙ 
         <span>Barangay settings</span>
       </button>
       
@@ -1240,33 +1247,38 @@
           <p>Manage community services and keep residents informed.</p>
         </div>
 
-        <button class="btn btn-primary" v-if="adminPage==='posts'" @click="showPostForm=!showPostForm">＋ New announcement</button>
+        <button class="btn btn-primary" v-if="adminPage==='posts' && can('announcements')" @click="showPostForm=!showPostForm">＋ New announcement</button>
       
       </div>
 
       <section v-if="adminPage==='overview'">
-        <div class="admin-stat-grid">
+        <div v-if="noSections" class="panel empty-state no-access" role="status">
+          <b>No sections assigned yet</b>
+          <p>Your account doesn't have access to any part of the admin panel. Ask your Super Admin to switch on the sections you handle.</p>
+        </div>
 
-          <div class="admin-stat">
+        <div v-if="!noSections" class="admin-stat-grid">
+
+          <div v-if="can('residents')" class="admin-stat">
             <button type="button" class="stat-main" @click="goAdmin('profiles')" title="View all resident profiles">Resident profiles</button>
             <b>{{activeProfiles.length}}</b>
             <em><strong>{{pendingResidents.length}}</strong> Pending verification ·
               <strong>{{deactivatedProfiles.length}}</strong> deactivated<template v-if="pendingAppeals.length"> ({{pendingAppeals.length}} appeal)</template></em>
           </div>
 
-          <div class="admin-stat">
+          <div v-if="can('requests')" class="admin-stat">
             <button type="button" class="stat-main" @click="goAdmin('requests')" title="View all document requests">Document requests</button>
             <b>{{requests.length}}</b>
             <em><strong>{{pendingRequests.length}}</strong> Awaiting review</em>
           </div>
 
-          <div class="admin-stat">
+          <div v-if="can('reports')" class="admin-stat">
             <button type="button" class="stat-main" @click="goAdmin('reports')" title="View all concern reports">Concern reports</button>
             <b>{{reports.length}}</b>
             <em><strong>{{openReports.length}}</strong> Still open</em>
           </div>
 
-          <div class="admin-stat">
+          <div v-if="can('announcements')" class="admin-stat">
             <button type="button" class="stat-main" @click="goAdmin('posts')" title="View all public posts">Public posts</button>
             <b>{{announcements.length}}</b>
             <em><strong>{{emergencyCount}}</strong> Emergency alerts ·
@@ -1275,8 +1287,8 @@
 
         </div>
 
-        <div class="admin-columns">
-          <div class="panel">
+        <div v-if="!noSections && (can('requests') || can('reports'))" class="admin-columns">
+          <div v-if="can('requests')" class="panel">
 
             <div class="panel-heading">
               <h3>Recent document requests</h3>
@@ -1299,7 +1311,7 @@
           
           </div>
           
-          <div class="panel">
+          <div v-if="can('reports')" class="panel">
             <div class="panel-heading">
               <h3>Recent concern reports</h3>
               <button class="text-link" @click="adminPage='reports'">View all →</button>
@@ -1321,9 +1333,9 @@
         
         </div>
         
-        <div class="admin-columns">
+        <div v-if="!noSections && (can('residents') || can('announcements'))" class="admin-columns">
 
-          <div class="panel">
+          <div v-if="can('residents')" class="panel">
             <div class="panel-heading">
               <h3>Recent resident verification requests</h3>
               <button class="text-link" @click="goAdmin('profiles')">View all →</button>
@@ -1345,7 +1357,7 @@
             <div v-if="!recentProfiles.length" class="empty-state">No resident profiles yet.</div>
           </div>
 
-          <div class="panel">
+          <div v-if="can('announcements')" class="panel">
             <div class="panel-heading">
               <h3>Recent announcements</h3>
               <button class="text-link" @click="goAdmin('posts')">View all →</button>
@@ -1368,7 +1380,7 @@
 
       <section v-else-if="adminPage==='verifications'" class="panel admin-table-panel">
         <div class="panel-heading">
-          <h3>Resident verification</h3>
+          <h3>Resident Accounts</h3>
           <span class="muted">{{verifiedResidents.length}} verified · {{pendingResidents.length}} pending · {{deactivatedProfiles.length}} deactivated</span>
         </div>
         <div class="admin-toolbar">
@@ -1395,7 +1407,7 @@
                 <th>Address</th>
                 <th>Status</th>
                 <th>Warnings</th>
-                <th>Action</th>
+                <th class="arrow-col"><span class="sr-only">Quick action and details</span></th>
 
               </tr>
             </thead>
@@ -1415,14 +1427,14 @@
                 </td>
 
                 <td>
-                  <span class="status-pill" :class="p.warnings.length ? 'status-rejected' : 'status-done'">{{p.warnings.length}}/{{maxWarnings}}</span>
+                  <button type="button" class="status-pill warn-pill" :class="p.warnings.length ? 'status-rejected' : 'status-done'" title="View current warnings" @click="openWarnDialog(p,'current')">{{p.warnings.length}}/{{maxWarnings}}</button>
+                  <button type="button" class="text-link warn-link" @click="openWarnDialog(p,'history')">History</button>
                 </td>
 
-                <td>
-                  <div class="row-actions">
-                    <button class="small-action" @click="toggleVerified(p)">{{p.verified?'Revoke':'Mark verified'}}</button>
-                    <button class="small-action" @click="openAccountDialog('warn',p)">Warning</button>
-                    <button class="small-action danger" @click="openAccountDialog('deactivate',p)">Deactivate</button>
+                <td class="arrow-col">
+                  <div class="row-end">
+                    <button v-if="!p.verified" type="button" class="small-action" @click="toggleVerified(p)" :aria-label="'Mark '+(p.name||'this resident')+' as verified'">✓ Mark verified</button>
+                    <button type="button" class="row-arrow" :aria-label="'View full details of '+(p.name||'this resident')" title="View full details" @click="openResident(p.id,'verifications')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
                   </div>
                 </td>
 
@@ -1450,7 +1462,7 @@
                 <th>Reason</th>
                 <th>Deactivated</th>
                 <th>Appeal</th>
-                <th>Action</th>
+                <th class="arrow-col"><span class="sr-only">Details</span></th>
 
               </tr>
             </thead>
@@ -1474,11 +1486,8 @@
                   <span v-else class="muted">No appeal</span>
                 </td>
 
-                <td>
-                  <div class="row-actions">
-                    <button class="small-action" @click="reactivateAccount(p)">Reactivate</button>
-                    <button v-if="p.appeal && p.appeal.status==='Pending'" class="small-action danger" @click="openAccountDialog('denyAppeal',p)">Deny appeal</button>
-                  </div>
+                <td class="arrow-col">
+                  <button type="button" class="row-arrow" :aria-label="'View full details of '+(p.name||'this resident')" title="View full details" @click="openResident(p.id,'verifications')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
                 </td>
 
               </tr>
@@ -1497,6 +1506,289 @@
 
         <p class="table-note">Note: real on-site ID checking must be performed by authorized barangay staff before marking a resident verified.</p>
       
+      </section>
+
+      <section v-else-if="adminPage==='resident' && residentView" class="panel resident-page">
+        <div class="obj-crumb">
+          <button type="button" class="back-link" @click="closeResident">← Back to {{residentView.from==='accounts' ? 'Account modification' : 'Resident Accounts'}}</button>
+        </div>
+
+        <p v-if="residentView.loading" class="muted obj-pad">Loading the resident…</p>
+        <div v-else-if="residentView.error" class="auth-error obj-pad" role="alert">
+          {{residentView.error}}
+          <button type="button" class="small-action" @click="openResident(residentView.id, residentView.from)">Try again</button>
+        </div>
+
+        <template v-else-if="residentView.data">
+          <!-- header: who it is + facts at a glance -->
+          <header class="obj-head">
+            <div class="obj-id">
+              <div class="resident-avatar" aria-hidden="true">{{(residentView.data.name||'?').trim().charAt(0).toUpperCase()}}</div>
+              <div class="obj-id-text">
+                <h2>{{residentView.data.name||'Unnamed resident'}}</h2>
+                <p class="obj-sub"><a :href="'mailto:'+residentView.data.email">{{residentView.data.email}}</a></p>
+                <p class="obj-pills">
+                  <span class="status-pill" :class="residentView.data.verified ? 'status-done' : 'status-pending'">{{residentView.data.verified ? 'Verified' : 'Pending verification'}}</span>
+                  <span v-if="residentView.data.deactivated" class="status-pill status-rejected">Deactivated</span>
+                </p>
+              </div>
+            </div>
+
+            <dl class="obj-facts">
+              <div class="fact">
+                <dt>Barangay</dt>
+                <dd :class="{'is-empty': !residentView.data.barangay}">{{residentView.data.barangay||'Not provided'}}<template v-if="residentView.data.municipality"><small>{{residentView.data.municipality}}<template v-if="residentView.data.province">, {{residentView.data.province}}</template></small></template></dd>
+              </div>
+              <div class="fact">
+                <dt>Account status</dt>
+                <dd><span class="status-pill" :class="residentView.data.deactivated ? 'status-rejected' : 'status-done'">{{residentView.data.deactivated ? 'Deactivated' : 'Active'}}</span></dd>
+              </div>
+              <div class="fact">
+                <dt>Warnings</dt>
+                <dd><span class="status-pill" :class="residentView.data.warnings.length ? 'status-rejected' : 'status-done'">{{residentView.data.warnings.length}}/{{maxWarnings}}</span></dd>
+              </div>
+              <div class="fact">
+                <dt>Account created</dt>
+                <dd :class="{'is-empty': !residentView.data.created}">{{residentView.data.created ? formatDate(residentView.data.created) : 'Not available'}}</dd>
+              </div>
+            </dl>
+
+            <!-- quick actions: the everyday ones, always in view. Risky or rare ones live in the "More actions" tab -->
+            <div class="obj-quick" role="group" aria-label="Quick actions">
+              <span class="obj-quick-label">Quick actions</span>
+              <template v-if="!residentView.data.deactivated">
+                <button v-if="!residentView.data.verified" type="button" class="btn btn-primary" @click="toggleVerified(residentView.data)">✓ Mark verified</button>
+                <button type="button" class="small-action" @click="openAccountDialog('warn', residentView.data)">⚠ Send warning</button>
+              </template>
+              <button v-else type="button" class="btn btn-primary" @click="reactivateAccount(residentView.data)">Reactivate account</button>
+            </div>
+          </header>
+
+          <!-- tabs -->
+          <div class="obj-tabs" role="tablist" aria-label="Resident information">
+            <button type="button" role="tab" id="rtab-details" :aria-selected="residentTab==='details'" :class="{active:residentTab==='details'}" @click="residentTab='details'">Details</button>
+            <button type="button" role="tab" id="rtab-standing" :aria-selected="residentTab==='standing'" :class="{active:residentTab==='standing'}" @click="residentTab='standing'">Standing<i v-if="residentView.data.warnings.length" class="tab-count">{{residentView.data.warnings.length}}</i></button>
+            <button type="button" role="tab" id="rtab-activity" :aria-selected="residentTab==='activity'" :class="{active:residentTab==='activity'}" @click="residentTab='activity'">Activity</button>
+            <button type="button" role="tab" id="rtab-more" :aria-selected="residentTab==='more'" :class="{active:residentTab==='more'}" @click="residentTab='more'">Actions</button>
+          </div>
+
+          <div class="obj-body">
+            <!-- DETAILS -->
+            <div v-show="residentTab==='details'" role="tabpanel" aria-labelledby="rtab-details">
+              <section class="obj-section">
+                <h3>Personal details</h3>
+                <dl class="field-grid">
+                  <div class="field"><dt>First name</dt><dd :class="{'is-empty': !residentView.data.first_name}">{{residentView.data.first_name||'Not provided'}}</dd></div>
+                  <div class="field"><dt>Middle name</dt><dd :class="{'is-empty': !residentView.data.middle_name}">{{residentView.data.middle_name||'Not provided'}}</dd></div>
+                  <div class="field"><dt>Last name</dt><dd :class="{'is-empty': !residentView.data.last_name}">{{residentView.data.last_name||'Not provided'}}</dd></div>
+                  <div class="field"><dt>Email</dt><dd>{{residentView.data.email}}</dd></div>
+                  <div class="field"><dt>Contact number</dt><dd :class="{'is-empty': !residentView.data.contact}">{{residentView.data.contact||'Not provided'}}</dd></div>
+                  <div class="field field-wide"><dt>Address</dt><dd :class="{'is-empty': !residentView.data.address}">{{residentView.data.address||'Not provided'}}</dd></div>
+                </dl>
+              </section>
+
+              <section class="obj-section">
+                <h3>Account information</h3>
+                <dl class="field-grid">
+                  <div class="field field-wide"><dt>Barangay</dt><dd :class="{'is-empty': !residentView.data.barangay}">{{residentView.data.barangay||'Not provided'}}<template v-if="residentView.data.municipality"> · {{residentView.data.municipality}}<template v-if="residentView.data.province">, {{residentView.data.province}}</template></template></dd></div>
+                  <div class="field"><dt>Verification</dt><dd>{{residentView.data.verified ? 'Verified' : 'Not verified yet'}}<small v-if="residentView.data.verified && residentView.data.verified_at">on {{formatDate(residentView.data.verified_at)}}</small></dd></div>
+                  <div class="field"><dt>Account created</dt><dd :class="{'is-empty': !residentView.data.created}">{{residentView.data.created ? formatDate(residentView.data.created) : 'Not available'}}</dd></div>
+                  <div class="field field-wide"><dt>Account ID</dt><dd><code>{{residentView.data.id}}</code></dd></div>
+                </dl>
+              </section>
+            </div>
+
+            <!-- STANDING -->
+            <div v-show="residentTab==='standing'" role="tabpanel" aria-labelledby="rtab-standing">
+              <section class="obj-section">
+                <div class="obj-section-head">
+                  <h3>Warnings</h3>
+                  <div class="obj-actions">
+                    <button type="button" class="small-action" @click="openWarnDialog(residentView.data,'current')">Current warnings</button>
+                    <button type="button" class="small-action" @click="openWarnDialog(residentView.data,'history')">Warning history</button>
+                  </div>
+                </div>
+                <div class="warn-meter" :class="{danger: residentView.data.warnings.length}">
+                  <div class="warn-meter-count"><b>{{residentView.data.warnings.length}}</b><span>of {{maxWarnings}} warnings</span></div>
+                  <div class="warn-meter-bar" role="img" :aria-label="residentView.data.warnings.length+' of '+maxWarnings+' warnings'">
+                    <span v-for="n in maxWarnings" :key="n" :class="{on: n <= residentView.data.warnings.length}"></span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="obj-section">
+                <h3>Account standing</h3>
+                <dl class="field-grid">
+                  <div class="field"><dt>Account status</dt><dd><span class="status-pill" :class="residentView.data.deactivated ? 'status-rejected' : 'status-done'">{{residentView.data.deactivated ? 'Deactivated' : 'Active'}}</span></dd></div>
+                  <div class="field" v-if="residentView.data.deactivated"><dt>Deactivated on</dt><dd :class="{'is-empty': !residentView.data.deactivated_at}">{{residentView.data.deactivated_at ? formatDate(residentView.data.deactivated_at) : 'Not available'}}</dd></div>
+                  <div class="field field-wide" v-if="residentView.data.deactivated"><dt>Reason</dt><dd :class="{'is-empty': !residentView.data.deactivation_reason}">{{residentView.data.deactivation_reason||'Not provided'}}</dd></div>
+                </dl>
+              </section>
+
+              <section class="obj-section" v-if="residentView.data.appeal">
+                <h3>Appeal</h3>
+                <p class="obj-appeal-meta">
+                  <span class="status-pill" :class="residentView.data.appeal.status==='Pending' ? 'status-pending' : residentView.data.appeal.status==='Approved' ? 'status-done' : 'status-rejected'">{{residentView.data.appeal.status}}</span>
+                  <span v-if="residentView.data.appeal.date" class="muted">{{formatDate(residentView.data.appeal.date)}}</span>
+                </p>
+                <p class="detail-note">{{residentView.data.appeal.message}}</p>
+                <p v-if="residentView.data.appeal.response" class="detail-note"><b>Response:</b> {{residentView.data.appeal.response}}</p>
+                <button v-if="residentView.data.appeal.status==='Pending'" type="button" class="text-link" @click="residentTab='more'">Decide on this appeal in Actions →</button>
+              </section>
+            </div>
+
+            <!-- ACTIVITY -->
+            <div v-show="residentTab==='activity'" role="tabpanel" aria-labelledby="rtab-activity">
+              <section class="obj-section">
+                <h3>Activity</h3>
+                <div class="stat-tiles">
+                  <div class="stat-tile"><b>{{residentView.data.requests_count}}</b><span>Document requests</span></div>
+                  <div class="stat-tile"><b>{{residentView.data.reports_count}}</b><span>Concern reports</span></div>
+                </div>
+              </section>
+            </div>
+
+            <!-- MORE ACTIONS -->
+            <div v-show="residentTab==='more'" role="tabpanel" aria-labelledby="rtab-more">
+              <section class="obj-section" v-if="residentView.data.verified || isSuper">
+                <h3>Account actions</h3>
+                <ul class="action-list">
+                  <li v-if="residentView.data.verified">
+                    <div><b>Revoke verification</b><p>Marks this resident as not verified again. You can verify them again at any time.</p></div>
+                    <button type="button" class="small-action" @click="toggleVerified(residentView.data)">Revoke verification</button>
+                  </li>
+                  <li v-if="isSuper">
+                    <div><b>Reset password</b><p>Creates a temporary password for this resident. They must change it the next time they sign in.</p></div>
+                    <button type="button" class="small-action" @click="openModDialog('reset', residentView.data, 'resident')">Reset password</button>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="obj-section danger-zone" v-if="!residentView.data.deactivated || (residentView.data.appeal && residentView.data.appeal.status==='Pending') || isSuper">
+                <h3>Danger zone</h3>
+                <ul class="action-list">
+                  <li v-if="!residentView.data.deactivated">
+                    <div><b>Deactivate account</b><p>The resident can no longer use their account. You will be asked for a reason, and they will see it.</p></div>
+                    <button type="button" class="small-action danger" @click="openAccountDialog('deactivate', residentView.data)">Deactivate account</button>
+                  </li>
+                  <li v-if="residentView.data.appeal && residentView.data.appeal.status==='Pending'">
+                    <div><b>Deny appeal</b><p>Keeps the account deactivated and tells the resident their appeal was denied, with your reason.</p></div>
+                    <button type="button" class="small-action danger" @click="openAccountDialog('denyAppeal', residentView.data)">Deny appeal</button>
+                  </li>
+                  <li v-if="isSuper">
+                    <div><b>Delete account</b><p>Permanently removes this account and its data. This cannot be undone.</p></div>
+                    <button type="button" class="small-action danger" @click="openModDialog('delete', residentView.data, 'resident')">Delete account</button>
+                  </li>
+                </ul>
+              </section>
+
+              <p v-if="!(residentView.data.verified || isSuper || !residentView.data.deactivated || (residentView.data.appeal && residentView.data.appeal.status==='Pending'))" class="muted">There are no other actions available for this account.</p>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <section v-else-if="adminPage==='staff' && staffView && isSuper" class="panel resident-page staff-page">
+        <div class="obj-crumb">
+          <button type="button" class="back-link" @click="closeStaff">← Back to Account modification</button>
+        </div>
+
+        <p v-if="staffView.loading" class="muted obj-pad">Loading the staff account…</p>
+        <div v-else-if="staffView.error" class="auth-error obj-pad" role="alert">
+          {{staffView.error}}
+          <button type="button" class="small-action" @click="openStaff(staffView.id)">Try again</button>
+        </div>
+
+        <template v-else-if="staffView.data">
+          <header class="obj-head">
+            <div class="obj-id">
+              <div class="resident-avatar" aria-hidden="true">{{(staffView.data.name||'S').trim().charAt(0).toUpperCase()}}</div>
+              <div class="obj-id-text">
+                <h2>{{staffView.data.name||'Staff account'}}</h2>
+                <p class="obj-sub"><a :href="'mailto:'+staffView.data.email">{{staffView.data.email}}</a></p>
+                <p class="obj-pills">
+                  <span class="status-pill status-submitted">Admin / Staff</span>
+                  <span class="status-pill" :class="staffView.data.sections.length===sectionInfo.length ? 'status-done' : 'status-pending'">{{staffView.data.sections.length===sectionInfo.length ? 'Full access' : staffView.data.sections.length ? staffView.data.sections.length+' of '+sectionInfo.length+' sections' : 'No access'}}</span>
+                </p>
+              </div>
+            </div>
+
+            <dl class="obj-facts">
+              <div class="fact">
+                <dt>Barangay</dt>
+                <dd :class="{'is-empty': !staffView.data.barangay}">{{staffView.data.barangay||'Not provided'}}<template v-if="staffView.data.municipality"><small>{{staffView.data.municipality}}</small></template></dd>
+              </div>
+              <div class="fact">
+                <dt>Password</dt>
+                <dd><span class="status-pill" :class="staffView.data.must_change_password ? 'status-pending' : 'status-done'">{{staffView.data.must_change_password ? 'Temporary' : 'Set by the staff'}}</span></dd>
+              </div>
+            </dl>
+          </header>
+
+          <!-- Admin Nav --> 
+          <div class="obj-tabs" role="tablist" aria-label="Staff information">
+            <button type="button" role="tab" id="stab-access" :aria-selected="staffTab==='access'" :class="{active:staffTab==='access'}" @click="staffTab='access'">Access</button>
+            <button type="button" role="tab" id="stab-more" :aria-selected="staffTab==='more'" :class="{active:staffTab==='more'}" @click="staffTab='more'">Actions</button>
+          </div>
+
+          <div class="obj-body">
+            <div v-show="staffTab==='access'" role="tabpanel" aria-labelledby="stab-access">
+              <section class="obj-section">
+                <h3>Panel access</h3>
+                <p class="muted access-intro">Choose which parts of the admin panel this account can open. Everything else is hidden from their sidebar and dashboard, and the server refuses it too.</p>
+
+                <div class="access-bar">
+                  <button type="button" class="small-action" @click="setAllSections(true)" :disabled="staffDraft.length===sectionInfo.length">Allow all</button>
+                  <button type="button" class="small-action" @click="setAllSections(false)" :disabled="!staffDraft.length">Allow none</button>
+                </div>
+
+                <ul class="access-list">
+                  <li v-for="s in sectionInfo" :key="s.key" class="access-row">
+                    <div>
+                      <b :id="'acc-'+s.key">{{s.label}}</b>
+                      <small>{{s.desc}}</small>
+                    </div>
+                    <button type="button" class="switch" role="switch" :class="{on:staffDraft.includes(s.key)}" :aria-checked="staffDraft.includes(s.key)" :aria-labelledby="'acc-'+s.key" @click="toggleSection(s.key)">
+                      <span class="switch-knob"></span>
+                    </button>
+                  </li>
+                </ul>
+
+                <p v-if="!staffDraft.length" class="auth-error access-warn" role="status">With every section off, this account can sign in but sees nothing in the panel.</p>
+
+                <div class="access-save">
+                  <button type="button" class="btn btn-primary" :disabled="!staffDirty || staffSaving" @click="saveAccess">{{staffSaving ? 'Saving…' : 'Save access'}}</button>
+                  <button type="button" class="small-action" v-if="staffDirty" :disabled="staffSaving" @click="staffDraft=[...staffView.data.sections]">Discard changes</button>
+                  <span v-if="staffSaved && !staffDirty" class="muted">✓ Saved</span>
+                  <span v-else-if="staffDirty" class="muted">Unsaved changes</span>
+                </div>
+              </section>
+            </div>
+
+            <!-- ACTIONS -->
+            <div v-show="staffTab==='more'" role="tabpanel" aria-labelledby="stab-more">
+              <section class="obj-section">
+                <h3>Account actions</h3>
+                <ul class="action-list">
+                  <li>
+                    <div><b>Reset password</b><p>Creates a temporary password for this staff member. They must change it the next time they sign in.</p></div>
+                    <button type="button" class="small-action" @click="openModDialog('reset', staffView.data, 'staff')">Reset password</button>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="obj-section danger-zone">
+                <h3>Danger zone</h3>
+                <ul class="action-list">
+                  <li>
+                    <div><b>Delete account</b><p>Permanently removes this staff account. They lose access to the staff portal right away. This cannot be undone.</p></div>
+                    <button type="button" class="small-action danger" @click="openModDialog('delete', staffView.data, 'staff')">Delete account</button>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </template>
       </section>
 
       <section v-else-if="adminPage==='accounts' && isSuper" class="panel admin-table-panel account-mod">
@@ -1524,7 +1816,8 @@
                 <th>Email</th>
                 <th v-if="isOwner">Barangay</th>
                 <th>Role</th>
-                <th>Action</th>
+                <th>Access</th>
+                <th class="arrow-col"><span class="sr-only">Details</span></th>
               </tr>
             </thead>
             <tbody>
@@ -1533,15 +1826,16 @@
                 <td>{{a.email}}</td>
                 <td v-if="isOwner">{{a.barangay||'—'}}<small v-if="a.municipality" class="muted"> · {{a.municipality}}</small></td>
                 <td><span class="status-pill status-submitted">Admin / Staff</span></td>
-                <td>
-                  <div class="row-actions">
-                    <button class="small-action" @click="openModDialog('reset',a)">Reset Password</button>
-                    <button class="small-action danger" @click="openModDialog('delete',a)">Delete Account</button>
-                  </div>
+                <td class="access-cell">
+                  <span class="status-pill" :class="accessSummary(a.sections).level==='full' ? 'status-done' : 'status-pending'">{{accessSummary(a.sections).pill}}</span>
+                  <small class="access-note">{{accessSummary(a.sections).text}}</small>
+                </td>
+                <td class="arrow-col">
+                  <button type="button" class="row-arrow" :aria-label="'Open details and access of '+(a.name||'this staff account')" title="Details and access" @click="openStaff(a.id)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
                 </td>
               </tr>
               <tr v-if="!modList.length">
-                <td :colspan="isOwner ? 5 : 4" class="empty-cell">
+                <td :colspan="isOwner ? 6 : 5" class="empty-cell">
                   {{modLoading ? 'Loading accounts…' : modSearch.trim() ? 'No staff account matches that search.' : 'There are no Staff accounts yet. Use Create Staff account to add one.'}}
                 </td>
               </tr>
@@ -1555,7 +1849,7 @@
                 <th>Email</th>
                 <th v-if="isOwner">Barangay</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th class="arrow-col"><span class="sr-only">Details</span></th>
               </tr>
             </thead>
             <tbody>
@@ -1566,11 +1860,8 @@
                 <td>
                   <span class="status-pill" :class="a.deactivated ? 'status-rejected' : a.verified ? 'status-done' : 'status-pending'">{{a.deactivated ? 'Deactivated' : a.verified ? 'Verified' : 'Pending'}}</span>
                 </td>
-                <td>
-                  <div class="row-actions">
-                    <button class="small-action" @click="openModDialog('reset',a)">Reset Password</button>
-                    <button class="small-action danger" @click="openModDialog('delete',a)">Delete Account</button>
-                  </div>
+                              <td class="arrow-col">
+                  <button type="button" class="row-arrow" :aria-label="'View full details of '+(a.name||'this resident')" title="View full details" @click="openResident(a.id,'accounts')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
                 </td>
               </tr>
               <tr v-if="!modList.length">
@@ -1940,28 +2231,6 @@
 
   </main>
 
-  <footer class="site-footer">
-
-    <div class="footer-brand">
-      <img class="footer-logo" src="../assets/logos/full_logo.png" alt="kaBRGY logo" />
-      <div class="footer-text">
-        <b>kaBRGY</b>
-        <small>Your Barangay Is One Click Away</small>
-      </div>
-    </div>
-    
-    <div v-if="role==='resident' && !mustChange" class="footer-links">
-      <button @click="page='announcements'">Announcements</button>
-      <label class="footer-copy">·</label>
-      <button @click="page='manual'">User guide</button>
-      <label class="footer-copy">·</label>
-      <button @click="page='services'">Services</button>
-    </div>
-    
-    <span class="footer-copy">© 2026 kaBRGY · Version 2.2.1 · Latest Release  </span>
-  
-  </footer>
-
   <div v-if="accountDialog" class="modal-backdrop" @click.self="closeAccountDialog" role="presentation">
     <form class="success-modal reject-modal" @submit.prevent="confirmAccountDialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
       <button type="button" class="modal-close" @click="closeAccountDialog" aria-label="Cancel">×</button>
@@ -1985,6 +2254,47 @@
       </div>
 
     </form>
+  </div>
+
+  <div v-if="warnDialog && role==='admin'" class="modal-backdrop" @click.self="closeWarnDialog" role="presentation">
+    <div class="success-modal reject-modal" role="dialog" aria-modal="true" aria-labelledby="warn-dialog-title">
+      <button type="button" class="modal-close" @click="closeWarnDialog" aria-label="Close">×</button>
+      <h2 id="warn-dialog-title">{{warnDialog.mode==='current' ? 'Current warnings' : 'Warning history'}}</h2>
+      <p>{{warnDialog.profile.name||'Unnamed resident'}} · {{warnDialog.profile.email}}</p>
+      <p class="muted">{{warnDialog.profile.warnings.length}} of {{maxWarnings}} active warnings<template v-if="warnDialog.mode==='history' && !warnDialog.loading && !warnDialog.error"> · {{warnDialog.items.length}} in total</template></p>
+
+      <p v-if="warnDialog.loading" class="muted">Loading…</p>
+      <div v-else-if="warnDialog.error" class="auth-error" role="alert">{{warnDialog.error}}</div>
+      <ul v-else-if="warnItems().length" class="warn-history">
+        <li v-for="w in warnItems()" :key="w.id" :class="{cleared:w.status!=='Active', lifted:w.status==='Lifted'}">
+          <div class="warn-meta">
+            <b>Warning {{w.no}}</b> · {{w.date}}<template v-if="w.issued_by"> · by {{w.issued_by}}</template>
+            <span class="status-pill" :class="w.status==='Active' ? 'status-rejected' : w.status==='Lifted' ? 'status-pending' : 'status-done'">{{w.status}}</span>
+          </div>
+          <p>{{w.reason}}</p>
+          <small v-if="w.status==='Cleared'" class="muted">Cleared on {{w.cleared||'—'}} when the account was reactivated.</small>
+          <small v-else-if="w.status==='Lifted'" class="muted">Lifted on {{w.cleared||'—'}}<template v-if="w.cleared_by"> by {{w.cleared_by}}</template>.</small>
+          <div v-if="!warnDialog.confirm || warnDialog.confirm.id!==w.id" class="warn-actions">
+            <button v-if="w.status==='Active'" type="button" class="small-action" @click="askWarningAction(w,'lift')">Lift</button>
+            <button v-else type="button" class="small-action danger" @click="askWarningAction(w,'delete')">Delete</button>
+          </div>
+          <div v-else class="warn-actions confirm">
+            <span>{{warnDialog.confirm.kind==='lift' ? 'Lift this warning? It stays in the history as Lifted, it no longer counts toward the 3, and the resident will be notified.' : 'Delete this warning for good? It is removed from the history and cannot be restored.'}}</span>
+            <button type="button" class="small-action" :disabled="warnDialog.busy" @click="cancelWarningAction()">Cancel</button>
+            <button type="button" :class="['small-action', warnDialog.confirm.kind==='delete' ? 'danger solid' : '']" :disabled="warnDialog.busy" @click="confirmWarningAction()">{{warnDialog.busy ? (warnDialog.confirm.kind==='lift' ? 'Lifting…' : 'Deleting…') : (warnDialog.confirm.kind==='lift' ? 'Yes, lift' : 'Yes, delete')}}</button>
+          </div>
+        </li>
+      </ul>
+      <p v-else-if="warnDialog.mode==='current'" class="empty-cell">This resident has no current warnings.</p>
+      <p v-else class="empty-cell">No warnings have ever been sent to this account.</p>
+
+      <div v-if="warnDialog.actionError" class="auth-error" role="alert">{{warnDialog.actionError}}</div>
+      <p v-if="warnDialog.profile.deactivated" class="muted">This account is deactivated. Lifting a warning does not reactivate it. Use Reactivate if the deactivation was a mistake.</p>
+      <div class="reject-actions">
+        <button v-if="warnDialog.mode==='current'" type="button" class="btn btn-ghost" @click="warnDialog.mode='history'">View full history</button>
+        <button type="button" class="btn btn-ghost" @click="closeWarnDialog">Close</button>
+      </div>
+    </div>
   </div>
 
   <div v-if="createDialog && isSuper" class="modal-backdrop" @click.self="closeCreateDialog" role="presentation">
@@ -2073,11 +2383,11 @@
           </template>
           <template v-else-if="modDialog.kind==='staff'">
             <p>Deleting this Staff account is permanent and cannot be undone. The staff member will lose access to the staff portal right away.</p>
-            <p>Nobody can log in with this account again unless a new account is created. The requests and reports they handled stay in the barangay records.</p>
+            <p>Nobody can log in with this account again unless a new account is created. Their name and the requests and reports they handled stay in the barangay records.</p>
           </template>
           <template v-else>
             <p>Deleting this resident account is permanent and cannot be undone. The profile (address, contact, verification status, warnings) and notifications will be removed, and the resident will lose access right away.</p>
-            <p>Their document requests and concern reports stay in the barangay records. To use the portal again, the resident must sign up and be verified from the start.</p>
+            <p>Their name, document requests and concern reports stay in the barangay records. To use the portal again, the resident must sign up and be verified from the start.</p>
           </template>
         </div>
 
@@ -2168,8 +2478,8 @@
 
 </div>
 
-<script src="api.js?v=3.0.0-c"></script>
-<script src="app.js?v=3.0.0-c"></script>
+<script src="api.js?v=3.0.0-d"></script>
+<script src="app.js?v=3.0.0-d"></script>
 
 </body>
 </html>

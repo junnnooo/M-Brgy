@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../utils/supabase.js";
 import { check, httpError, numericId, toDay, canTouchBarangay, scopeToBarangay } from "../utils/helpers.js";
-import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { requireAuth, requireSection, requireStaff } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
 });
 
 // Staff: archived alerts of their barangay (hidden from residents)
-router.get("/archived", requireAuth, requireStaff, async (req, res) => {
+router.get("/archived", requireAuth, requireStaff, requireSection("announcements"), async (req, res) => {
   const query = scopeToBarangay(
     supabase.from("alerts").select("*").not("archived_at", "is", null).order("starts_at", { ascending: false }),
     req.account,
@@ -35,7 +35,7 @@ router.get("/archived", requireAuth, requireStaff, async (req, res) => {
   res.json(check(await query).map(toAlert));
 });
 
-router.post("/", requireAuth, requireStaff, async (req, res) => {
+router.post("/", requireAuth, requireStaff, requireSection("announcements"), async (req, res) => {
   const { title, body } = req.body ?? {};
   if (!title?.trim() || !body?.trim()) throw httpError(400, "Title and message are required.");
   if (!req.account.brgy_id) throw httpError(400, "Your account isn't assigned to a barangay.");
@@ -58,7 +58,7 @@ router.post("/", requireAuth, requireStaff, async (req, res) => {
 });
 
 // Staff: take an alert off the public board (or put it back). Needs alerts.archived_at.
-router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+router.patch("/:id/archive", requireAuth, requireStaff, requireSection("announcements"), async (req, res) => {
   const id = numericId(req.params.id, "Alert");
   const { archived } = req.body ?? {};
   if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");
@@ -81,7 +81,7 @@ router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
   res.json(toAlert(updated));
 });
 
-router.delete("/:id", requireAuth, requireStaff, async (req, res) => {
+router.delete("/:id", requireAuth, requireStaff, requireSection("announcements"), async (req, res) => {
   const id = numericId(req.params.id, "Alert");
   const existing = check(
     await supabase.from("alerts").select("alert_id, brgy_id").eq("alert_id", id).maybeSingle(),

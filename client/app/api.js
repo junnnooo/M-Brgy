@@ -95,5 +95,6 @@ const api = {
   get(path) { return this.request(path); },
   post(path, body = {}) { return this.request(path, { method: "POST", body }); },
   patch(path, body = {}) { return this.request(path, { method: "PATCH", body }); },
+  put(path, body = {}) { return this.request(path, { method: "PUT", body }); },
   del(path) { return this.request(path, { method: "DELETE" }); },
 };

@@ -4,7 +4,7 @@ import {
   canTouchBarangay, check, fullName, httpError, numericId,
   parseRef, PERSON_COLUMNS, placeOf, PLACE_SELECT, scopeToBarangay, toDay,
 } from "../utils/helpers.js";
-import { requireActiveAccount, requireAuth, requireStaff } from "../middleware/auth.js";
+import { requireActiveAccount, requireAuth, requireSection, requireStaff } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 import { LIVE_REPORT_STATUSES, MAX_ACTIVE } from "./moderation.js";
 
@@ -58,7 +58,7 @@ router.get("/mine", requireAuth, async (req, res) => {
   res.json(rows.map(toReport));
 });
 
-router.get("/", requireAuth, requireStaff, async (req, res) => {
+router.get("/", requireAuth, requireStaff, requireSection("reports"), async (req, res) => {
   const query = scopeToBarangay(
     supabase.from("reports").select(SELECT).order("created_at", { ascending: false }),
     req.account,
@@ -78,7 +78,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   const allowed =
     report &&
     (report.account_id === req.account.account_id ||
-      (req.isStaff && canTouchBarangay(req.account, report.brgy_id)));
+      (req.isStaff && req.sections.includes("reports") && canTouchBarangay(req.account, report.brgy_id)));
   if (!allowed) throw httpError(404, "Report not found.");
 
   const id = report.report_id;
@@ -130,7 +130,7 @@ router.post("/", requireAuth, requireActiveAccount, async (req, res) => {
 
 // Staff: change a report's status. Rejecting requires a reason (min 5 characters), which is stored on the
 //        report (rejection_reason) and in the report's history (report_updates.remark).
-router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
+router.patch("/:id/status", requireAuth, requireStaff, requireSection("reports"), async (req, res) => {
   const id = numericId(req.params.id, "Report");
   const { status, remark, reason } = req.body ?? {};
   if (!STATUSES.includes(status)) throw httpError(400, "Unknown status.");
@@ -176,7 +176,7 @@ router.patch("/:id/status", requireAuth, requireStaff, async (req, res) => {
 });
 
 // Staff: move a report out of the active list (or back). Needs reports.archived_at (1.0.3 migration).
-router.patch("/:id/archive", requireAuth, requireStaff, async (req, res) => {
+router.patch("/:id/archive", requireAuth, requireStaff, requireSection("reports"), async (req, res) => {
   const id = numericId(req.params.id, "Report");
   const { archived } = req.body ?? {};
   if (typeof archived !== "boolean") throw httpError(400, "Send { archived: true } or { archived: false }.");

@@ -18,7 +18,7 @@ const parseRef = (value) => {
   return { type, canonical: `${brgy}-${type}-${year}-${no}${update ? "-" + update : ""}` };
 };
 
-// Dismissed Emergency Banner: remembered per resident account, in this browser only
+// Dismissed emergency banner: remembered per resident account, in this browser only
 const DISMISSED_KEY = "kabrgy_dismissed_alerts";
 const loadDismissed = () => {
   try {
@@ -35,12 +35,15 @@ const saveDismissed = (map) => {
   }
 };
 
+// Notification sounds (paths are relative to client/app/index.html)
 const SOUNDS = {
   regular: new Audio("../assets/sound/Notif_Sound.wav"),
   emergency: new Audio("../assets/sound/Emergency_Notif_Sound.wav"),
 };
 Object.values(SOUNDS).forEach((a) => (a.preload = "auto"));
 
+// Several sources (bell, announcements, alerts) can report something new in the same poll.
+// Requests are gathered for a moment and ONE sound plays (emergency wins), so nothing overlaps or restarts.
 let pendingSound = null;
 let soundTimer = null;
 const playSound = (kind) => {
@@ -58,6 +61,8 @@ const playSound = (kind) => {
   }, 600);
 };
 
+// Browsers only allow sound after a user gesture. On the first click/key/tap,
+// "prime" both sounds silently so later polled notifications can play.
 const unlockSounds = () => {
   Object.values(SOUNDS).forEach((a) => {
     a.muted = true;
@@ -88,22 +93,35 @@ const FINAL_STATUS = {
   report: ["Resolved", "Rejected"],
 };
 
-// Account Moderation + Limits (the server enforces the same numbers)
+// Account moderation + limits (the server enforces the same numbers)
 const MAX_WARNINGS = 3;
 const MAX_ACTIVE = 3;
 const LIVE_STATUS = {
   doc: ["Pending", "Approved", "Ready for Pickup"],
   report: ["Submitted", "Received", "In Progress"],
 };
-// Documents Allowed per Submission: Barangay 1 to 8 allow 2, every other barangay allows 3.
+// Documents allowed per submission: Barangay 1 to 8 allow 2, every other barangay allows 3.
 //                                   The number is read from the barangay name, e.g. "Lantic (Barangay 13)".
 const docLimitFor = (name) => {
   const n = Number(String(name || "").match(/barangay\s*(\d+)/i)?.[1]);
   return n >= 1 && n <= 8 ? 2 : 3;
 };
 
-// Admin Side Bar: collapsed or not, remembered in this browser
+// Admin side bar: collapsed or not, remembered in this browser
+// "collapsed" = the side panel is NOT pinned: it rests as an icon rail and opens while you use it
+// Sections a Super Admin can switch on/off for a staff account (keys match the server)
+const SECTION_INFO = [
+  { key: "residents", label: "Residents", desc: "Resident accounts: verify, warn, deactivate and view full details." },
+  { key: "requests", label: "Document requests", desc: "Review, approve or reject document requests." },
+  { key: "reports", label: "Concern reports", desc: "Review and update concern reports." },
+  { key: "announcements", label: "Announcements", desc: "Announcements and emergency alerts." },
+  { key: "settings", label: "Barangay settings", desc: "Open the Barangay settings page. Only the Owner can save changes." },
+];
+// which admin page needs which section
+const PAGE_SECTION = { verifications: "residents", resident: "residents", documents: "requests", reports: "reports", posts: "announcements", settings: "settings" };
 const SIDEBAR_KEY = "kabrgy_sidebar_collapsed";
+const SIDEBAR_UNPIN_MS = 2500; // after un-pinning, the panel stays open this long, then retracts
+const SIDEBAR_LEAVE_MS = 700; // after the pointer/focus leaves an unpinned panel
 const loadSidebar = () => {
   try {
     return localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -150,11 +168,11 @@ createApp({
       reports: [],
       profiles: [],
       notifications: [],
-      knownNotifIds: null,
+      knownNotifIds: null, // ids already seen, used to play a sound only for new notifications
       knownPostIds: null,
       knownAlertIds: null,
-      archivedPosts: [],
-      archivedAlerts: [],
+      archivedPosts: [], // staff only: archived announcements (hidden from residents)
+      archivedAlerts: [], // staff only: archived emergency alerts
 
       authMode: "login",
       authError: "",
@@ -169,6 +187,8 @@ createApp({
       page: "home",
       adminPage: "overview",
       sidebarCollapsed: loadSidebar(),
+      sidebarPeek: false, // an unpinned panel is temporarily open (hover, focus, or just after un-pinning)
+      sidebarTimer: null,
       announcementFilter: "All",
       requestFilter: "All",
       reportFilter: "All",
@@ -176,7 +196,7 @@ createApp({
       reportForm: blankReportForm(),
       postForm: blankPost(),
 
-      // Admin Tables: search by email + Active / Archived views
+      // admin tables: search by email + Active / Archived views
       verifSearch: "",
       docSearch: "",
       reportSearch: "",
@@ -200,15 +220,24 @@ createApp({
       reportStatusFilter: "All",
       docExpanded: false,
       reportExpanded: false,
-      trackLimit: 3,
+      trackLimit: 3, // rows shown before "See all"
 
-      // Reject Dialog: staff must give a reason before rejecting a request or a report
+      // Reject dialog: staff must give a reason before rejecting a request or a report
       rejectDialog: null,
       rejectError: "",
 
-      // Account Moderation: staff dialog (warn / deactivate / deny an appeal), resident appeal + warning pop-up
+      // Account moderation: staff dialog (warn / deactivate / deny an appeal), resident appeal + warning pop-up
       accountDialog: null,
       accountError: "",
+      warnDialog: null,
+      residentView: null, // the full details page of one resident
+      residentTab: "details", // which tab of that page is open
+      staffView: null, // the details page of one staff account (Super Admin)
+      staffTab: "access",
+      staffDraft: [], // the sections switched on in the Access tab, not saved yet
+      staffSaving: false,
+      staffSaved: false,
+      sectionInfo: SECTION_INFO,
       appealText: "",
       warningAck: false,
 
@@ -227,14 +256,14 @@ createApp({
       copied: false,
       copyTimer: null,
 
-      // Document Form Location: locked to the resident's own barangay until they confirm a change
+      // Document form location: locked to the resident's own barangay until they confirm a change
       docLocationUnlocked: false,
       reportLocationUnlocked: false,
       locationWarn: false,
-      locationWarnTarget: "doc",
+      locationWarnTarget: "doc", // which form the warning is about: "doc" or "report"
 
       notifOpen: false,
-      menuOpen: false,
+      menuOpen: false, // the avatar dropdown (Profile / Track Status / Log out)
       modal: "",
       modalTitle: "",
       modalMessage: "",
@@ -252,12 +281,26 @@ createApp({
       if (!this.me) return null;
       return this.me.is_staff ? "admin" : "resident";
     },
+    /* super admin (the "Admin" role, the Owner too) */
     isSuper() {
       return Boolean(this.me && this.me.is_super);
     },
+    /* nothing switched on for this staff account: the panel only shows a notice */
+    noSections() {
+      return this.role === "admin" && !this.isSuper && !SECTION_INFO.some((s) => this.can(s.key));
+    },
+    staffDirty() {
+      const v = this.staffView;
+      if (!v || !v.data) return false;
+      const a = [...this.staffDraft].sort().join(",");
+      const b = [...v.data.sections].sort().join(",");
+      return a !== b;
+    },
+    /* owner: the only one who sees every barangay, a super admin stays in their own */
     isOwner() {
       return Boolean(this.me && this.me.is_owner);
     },
+    /* still on a temporary password: the Change Password screen comes before anything else */
     mustChange() {
       return Boolean(this.me && this.me.must_change_password);
     },
@@ -302,9 +345,9 @@ createApp({
     recentAdminAnnouncements() {
       return this.announcements.slice(0, 5);
     },
-    // Sticky: An alert stays on screen for as long as the server still lists it. It never times out
-    //         on its own. It goes away when the resident dismisses it (X) or when it is archived/deleted,
-    //         which the 10-second refresh notices. If a refresh fails, the current banner simply stays.
+    // Sticky: an alert stays on screen for as long as the server still lists it. It never times out
+    // on its own. It goes away when the resident dismisses it (X) or when it is archived/deleted,
+    // which the 10-second refresh notices. If a refresh fails, the current banner simply stays.
     activeAlert() {
       return [...this.alerts].sort((x, y) => String(y.starts_at).localeCompare(String(x.starts_at)))[0] || null;
     },
@@ -349,6 +392,8 @@ createApp({
       const b = this.brgys(this.documentForm).find((x) => x.brgy_id === this.documentForm.brgy_id);
       return b ? docLimitFor(b.brgy_name) : 0;
     },
+    // The location pickers are read-only while they show the resident's registered barangay.
+    // If we cannot work out that barangay, nothing is locked so the form stays usable.
     docLocationLocked() {
       return Boolean(this.me?.brgy_id && this.findLocation(this.me.brgy_id)) && !this.docLocationUnlocked;
     },
@@ -459,13 +504,15 @@ createApp({
     },
     adminTitle() {
       return {
-        overview: "Official dashboard",
-        verifications: "Resident verification",
-        accounts: "Account modification",
-        documents: "Document requests",
-        reports: "Concern reports",
-        posts: "Announcements & alerts",
-        settings: "Barangay settings",
+        overview: "Official Dashboard",
+        verifications: "Resident Accounts",
+        resident: "Resident Details",
+        accounts: "Account Modification",
+        staff: "Staff Details",
+        documents: "Document Requests",
+        reports: "Concern Reports",
+        posts: "Announcements & Alerts",
+        settings: "Barangay Settings",
       }[this.adminPage];
     },
   },
@@ -478,6 +525,7 @@ createApp({
         this.notify(`This barangay allows up to ${max} documents per request. Your selection was trimmed.`);
       }
     },
+    // a bulk selection never survives a change of what is on screen
     docStatusFilter() { this.docExpanded = false; },
     reportStatusFilter() { this.reportExpanded = false; },
     docView() { this.docSelected = []; },
@@ -487,6 +535,11 @@ createApp({
     reportFilter() { this.reportSelected = []; },
     reportSearch() { this.reportSelected = []; },
     adminPage() {
+      // a page this account has no access to (restricted staff) never opens
+      if (!this.pageAllowed(this.adminPage)) {
+        this.adminPage = "overview";
+        return;
+      }
       this.docSelected = [];
       this.reportSelected = [];
       if (this.adminPage === "accounts") this.queueModLoad(0);
@@ -499,6 +552,7 @@ createApp({
     },
     modSearch() { this.queueModLoad(300); },
     notifications(list) {
+      // Only residents get the bell. Logged out: forget everything so the next login starts fresh.
       if (this.role !== "resident") {
         this.knownNotifIds = null;
         return;
@@ -536,7 +590,7 @@ createApp({
     async loadSession() {
       const me = await api.get("/auth/me");
       this.applyMe(me);
-      if (me.must_change_password) return;
+      if (me.must_change_password) return; // the server only answers /auth/me until the password is changed
       await this.loadAll();
     },
     applyMe(me) {
@@ -591,16 +645,19 @@ createApp({
     async loadAll() {
       const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
       const staff = this.role === "admin";
+      // restricted staff only fetch what they may see (the server answers 403 for the rest)
+      const ok = (s) => !staff || this.can(s);
+      const none = Promise.resolve([]);
       const [posts, alerts, notifications, requests, reports, profiles, archivedPosts, archivedAlerts] =
         await Promise.all([
-          api.get(`/announcements${q}`),
-          api.get(`/alerts${q}`),
+          ok("announcements") ? api.get(`/announcements${q}`) : none,
+          ok("announcements") ? api.get(`/alerts${q}`) : none,
           api.get("/notifications"),
-          api.get(staff ? "/requests" : "/requests/mine"),
-          api.get(staff ? "/reports" : "/reports/mine"),
-          staff ? api.get("/accounts") : Promise.resolve([]),
-          staff ? api.get("/announcements/archived") : Promise.resolve([]),
-          staff ? api.get("/alerts/archived") : Promise.resolve([]),
+          !ok("requests") ? none : api.get(staff ? "/requests" : "/requests/mine"),
+          !ok("reports") ? none : api.get(staff ? "/reports" : "/reports/mine"),
+          staff && this.can("residents") ? api.get("/accounts") : none,
+          staff && this.can("announcements") ? api.get("/announcements/archived") : none,
+          staff && this.can("announcements") ? api.get("/alerts/archived") : none,
         ]);
       Object.assign(this, {
         posts, alerts, notifications, requests, reports, profiles, archivedPosts, archivedAlerts,
@@ -619,8 +676,8 @@ createApp({
         /* the next poll will try again */
       }
     },
-    // Emergency banner: Slides down from under the header, and back up behind it.
-    //                   Driven from JS (Web Animations), so it does not depend on any CSS file.
+    // Emergency banner: slides down from under the header, and back up behind it.
+    // Driven from JS (Web Animations), so it does not depend on any CSS file.
     bannerEnter(el, done) { this.slideBanner(el, true, done); },
     bannerLeave(el, done) { this.slideBanner(el, false, done); },
     slideBanner(el, show, done) {
@@ -642,7 +699,7 @@ createApp({
         })
         .catch(done);
     },
-    // Residents: Quietly re-fetch announcements and emergency alerts so new ones appear without a reload
+    // Residents: quietly re-fetch announcements and emergency alerts so new ones appear without a reload
     async refreshBoard() {
       if (this.role !== "resident") return;
       const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
@@ -659,6 +716,7 @@ createApp({
         /* the next poll will try again */
       }
     },
+    // Play a sound when a list gains an id we haven't seen. The first load after login only records ids.
     boardSound(list, key, kind) {
       if (this.role !== "resident") {
         this[key] = null;
@@ -674,14 +732,24 @@ createApp({
       // don't swap the rows out from under a dialog the staff member is filling in
       if (this.rejectDialog || this.accountDialog) return;
       const q = this.me.brgy_id ? `?brgy_id=${this.me.brgy_id}` : "";
+      // a Super Admin may have changed this account's access: pick it up without a re-login
+      if (!this.isSuper) {
+        const me = await api.get("/auth/me");
+        if ([...(me.sections || [])].join() !== [...(this.me.sections || [])].join()) {
+          this.me = { ...this.me, sections: me.sections || [] };
+        }
+      }
+      const none = Promise.resolve(null);
       const [requests, reports, profiles, posts, alerts] = await Promise.all([
-        api.get("/requests"),
-        api.get("/reports"),
-        api.get("/accounts"),
-        api.get(`/announcements${q}`),
-        api.get(`/alerts${q}`),
+        this.can("requests") ? api.get("/requests") : none,
+        this.can("reports") ? api.get("/reports") : none,
+        this.can("residents") ? api.get("/accounts") : none,
+        this.can("announcements") ? api.get(`/announcements${q}`) : none,
+        this.can("announcements") ? api.get(`/alerts${q}`) : none,
       ]);
-      Object.assign(this, { requests, reports, profiles, posts, alerts });
+      const fresh = { requests, reports, profiles, posts, alerts };
+      for (const k of Object.keys(fresh)) if (fresh[k] === null) delete fresh[k];
+      Object.assign(this, fresh);
     },
 
     // The Helpers
@@ -777,16 +845,16 @@ createApp({
       }
     },
 
-    // Hold-to-reveal for password fields: Shows while pressed, hides on release / leave / blur
+    // Hold-to-reveal for password fields: shows while pressed, hides on release / leave / blur
     pwEvents(key) {
       const set = (on) => { this.showPw[key] = on; };
       return {
-        pointerdown: (e) => { e.preventDefault(); set(true); },
+        pointerdown: (e) => { e.preventDefault(); set(true); }, // preventDefault keeps focus in the input
         pointerup: () => set(false),
         pointerleave: () => set(false),
         pointercancel: () => set(false),
         blur: () => set(false),
-        contextmenu: (e) => e.preventDefault(),
+        contextmenu: (e) => e.preventDefault(), // stops the long-press menu on phones
         keydown: (e) => {
           if (e.key === " " || e.key === "Enter") { e.preventDefault(); set(true); }
         },
@@ -809,8 +877,8 @@ createApp({
       window.scrollTo({ top: 0 });
       this.notify(`Welcome, ${this.resident.first_name || "back"}`);
     },
-    // One "Account Log in" for everyone: The role that comes back from /auth/me decides
-    //                                    Which view opens (resident or admin/staff), so there is no account type to pick anymore.
+    // One "Account Log in" for everyone: the role that comes back from /auth/me decides
+    // which view opens (resident or admin/staff), so there is no account type to pick anymore.
     async loginAccount() {
       this.authError = "";
       try {
@@ -825,6 +893,7 @@ createApp({
         return;
       }
       if (this.mustChange) {
+        // temporary password: the Change Password screen opens instead of the home page
         this.loginForm = { email: "", password: "" };
         this.changeForm = blankChange();
         this.changeError = "";
@@ -922,6 +991,8 @@ createApp({
       this.rejectDialog = null;
       this.rejectError = "";
       this.accountDialog = null;
+      this.warnDialog = null;
+      this.residentView = null;
       this.accountError = "";
       this.appealText = "";
       this.changeForm = blankChange();
@@ -948,8 +1019,9 @@ createApp({
       window.scrollTo({ top: 0 });
     },
 
-    // Residents Document: Putting the location back to the resident's own barangay and locking it again.
-    //                     Used every time the page opens, and by "Use my barangay".
+    // Residents Document:
+    // Putting the location back to the resident's own barangay and locking it again.
+    // Used every time the page opens, and by "Use my barangay".
     async lockDocLocation() {
       this.docLocationUnlocked = false;
       this.locationWarn = false;
@@ -1225,6 +1297,19 @@ createApp({
 
     // For Admins:
     // Dashboard numbers: jump to a page with the matching filter preset
+    /* what a staff account may open: Super Admin / Owner everything, staff only the sections switched on */
+    can(section) {
+      if (this.role !== "admin") return false;
+      if (this.isSuper) return true;
+      return Array.isArray(this.me.sections) && this.me.sections.includes(section);
+    },
+    pageAllowed(page) {
+      if (this.role !== "admin") return true;
+      const need = PAGE_SECTION[page];
+      if (need) return this.can(need);
+      if (page === "accounts" || page === "staff") return this.isSuper;
+      return true;
+    },
     goAdmin(target) {
       const t = {
         profiles: ["verifications", () => { this.verifFilter = "all"; }],
@@ -1238,18 +1323,39 @@ createApp({
         emergency: ["posts", () => { this.annView = "active"; this.annTypeFilter = "Emergency"; }],
         archived: ["posts", () => { this.annView = "archived"; this.annTypeFilter = "All"; }],
       }[target];
-      if (!t) return;
+      if (!t || !this.pageAllowed(t[0])) return;
       this.verifSearch = this.docSearch = this.reportSearch = "";
       t[1]();
       this.adminPage = t[0];
     },
     toggleSidebar() {
+      // the pin: pinned = always open; un-pinned = rail that retracts by itself
       this.sidebarCollapsed = !this.sidebarCollapsed;
+      clearTimeout(this.sidebarTimer);
+      if (this.sidebarCollapsed) {
+        this.sidebarPeek = true;
+        this.sidebarTimer = setTimeout(() => (this.sidebarPeek = false), SIDEBAR_UNPIN_MS);
+      } else {
+        this.sidebarPeek = false;
+      }
       try {
         localStorage.setItem(SIDEBAR_KEY, this.sidebarCollapsed ? "1" : "0");
       } catch (e) {
         /* storage unavailable: the choice only lasts for this visit */
       }
+    },
+    sidebarEnter() {
+      clearTimeout(this.sidebarTimer);
+      if (this.sidebarCollapsed) this.sidebarPeek = true;
+    },
+    sidebarLeave() {
+      if (!this.sidebarCollapsed) return;
+      clearTimeout(this.sidebarTimer);
+      this.sidebarTimer = setTimeout(() => (this.sidebarPeek = false), SIDEBAR_LEAVE_MS);
+    },
+    sidebarFocusOut(e) {
+      // keyboard: close only when focus leaves the panel altogether
+      if (!e.currentTarget.contains(e.relatedTarget)) this.sidebarLeave();
     },
     async toggleVerified(p) {
       const next = !p.verified;
@@ -1283,11 +1389,12 @@ createApp({
         if (seq === this.modSeq) this.modLoading = false;
       }
     },
-    openModDialog(mode, account) {
+    openModDialog(mode, account, kind) {
       if (!this.isSuper) return;
       this.modDialog = {
         mode,
-        kind: this.modTab === "staff" ? "staff" : "resident",
+        // the resident details page passes "resident"; the Account modification list goes by its tab
+        kind: kind || (this.modTab === "staff" ? "staff" : "resident"),
         account,
         ack: false,
         busy: false,
@@ -1322,6 +1429,9 @@ createApp({
           this.modTotal = Math.max(0, this.modTotal - 1);
           this.profiles = this.profiles.filter((p) => p.id !== d.account.id);
           this.closeModDialog();
+          // deleted from its own details page: that page has nothing left to show, go back to the list
+          if (this.residentView && this.residentView.id === d.account.id) this.closeResident();
+          if (this.staffView && this.staffView.id === d.account.id) this.closeStaff();
           this.notify("Account deleted");
         }
       } catch (e) {
@@ -1402,6 +1512,154 @@ createApp({
         this.createError = e.message;
       } finally {
         d.busy = false;
+      }
+    },
+    /* short, readable summary of what a staff account can open (used in the Account modification list) */
+    accessSummary(sections) {
+      const keys = Array.isArray(sections) ? sections : [];
+      const total = this.sectionInfo.length;
+      if (!keys.length) {
+        return { level: "none", pill: "No access", text: "Can sign in but sees nothing in the panel." };
+      }
+      if (keys.length === total) {
+        return { level: "full", pill: "Full access", text: "Everything: " + this.sectionInfo.map((s) => s.label).join(", ") + "." };
+      }
+      const names = this.sectionInfo.filter((s) => keys.includes(s.key)).map((s) => s.label);
+      return { level: "limited", pill: "Limited access", text: "Can open: " + names.join(", ") + "." };
+    },
+    /* staff details (Super Admin): the ">" at the far right of a staff row opens this page */
+    async openStaff(id) {
+      if (!this.isSuper) return;
+      this.staffTab = "access";
+      this.staffSaved = false;
+      this.staffDraft = [];
+      this.staffView = { id, loading: true, error: "", data: null };
+      const v = this.staffView;
+      this.adminPage = "staff";
+      try {
+        const data = await api.get(`/super/staff/${id}`);
+        if (this.staffView === v) {
+          v.data = data;
+          this.staffDraft = [...data.sections];
+        }
+      } catch (e) {
+        if (this.staffView === v) v.error = e.message;
+      } finally {
+        if (this.staffView === v) v.loading = false;
+      }
+    },
+    closeStaff() {
+      this.staffView = null;
+      this.adminPage = "accounts";
+    },
+    toggleSection(key) {
+      this.staffSaved = false;
+      this.staffDraft = this.staffDraft.includes(key)
+        ? this.staffDraft.filter((k) => k !== key)
+        : [...this.staffDraft, key];
+    },
+    setAllSections(on) {
+      this.staffSaved = false;
+      this.staffDraft = on ? SECTION_INFO.map((s) => s.key) : [];
+    },
+    async saveAccess() {
+      const v = this.staffView;
+      if (!v || !v.data || this.staffSaving || !this.staffDirty) return;
+      this.staffSaving = true;
+      try {
+        const res = await api.put(`/super/staff/${v.id}/permissions`, { sections: SECTION_INFO.map((s) => s.key).filter((k) => this.staffDraft.includes(k)) });
+        const data = res && res.sections ? res : await api.get(`/super/staff/${v.id}`);
+        if (this.staffView === v) {
+          v.data = data;
+          this.staffDraft = [...data.sections];
+          this.staffSaved = true;
+        }
+        this.notify("Access saved. It applies to this account right away.");
+        this.queueModLoad(0);
+      } catch (e) {
+        this.notify(e.message);
+      } finally {
+        this.staffSaving = false;
+      }
+    },
+    /* full resident details (staff): the ">" at the far right of a resident row opens this page */
+    async openResident(id, from) {
+      if (this.role !== "admin") return;
+      this.residentTab = "details";
+      this.residentView = { id, from, loading: true, error: "", data: null };
+      const v = this.residentView; // the reactive copy
+      this.adminPage = "resident";
+      try {
+        const data = await api.get(`/accounts/${id}`);
+        if (this.residentView === v) v.data = data;
+      } catch (e) {
+        if (this.residentView === v) v.error = e.message;
+      } finally {
+        if (this.residentView === v) v.loading = false;
+      }
+    },
+    closeResident() {
+      const from = this.residentView ? this.residentView.from : "verifications";
+      this.residentView = null;
+      this.warnDialog = null;
+      this.adminPage = from;
+      // warnings may have been lifted on the details page: refresh the list behind it
+      if (from === "verifications") Promise.resolve(this.refreshStaffData()).catch(() => {});
+    },
+    /* warnings of a resident (staff). "current" = only the active ones (the pill), "history" = every warning ever sent */
+    async openWarnDialog(p, mode = "history") {
+      this.warnDialog = { profile: p, mode, items: [], loading: true, error: "", confirm: null, busy: false, actionError: "" };
+      const d = this.warnDialog; // the reactive copy, so the screen follows the changes below
+      try {
+        const items = await api.get(`/accounts/${p.id}/warnings`);
+        if (this.warnDialog === d) d.items = this.numberWarnings(items);
+      } catch (e) {
+        if (this.warnDialog === d) d.error = e.message;
+      } finally {
+        if (this.warnDialog === d) d.loading = false;
+      }
+    },
+    closeWarnDialog() {
+      this.warnDialog = null;
+    },
+    // "Warning 3" stays Warning 3 in both views
+    numberWarnings(items) {
+      return items.map((w, i) => ({ ...w, no: i + 1 }));
+    },
+    warnItems() {
+      const d = this.warnDialog;
+      if (!d) return [];
+      return d.mode === "current" ? d.items.filter((w) => w.status === "Active") : d.items;
+    },
+    // Lift = an active warning stops counting but stays in the history. Delete = a lifted or cleared warning is removed for good.
+    askWarningAction(w, kind) {
+      const d = this.warnDialog;
+      if (!d || d.busy) return;
+      d.confirm = { id: w.id, kind };
+      d.actionError = "";
+    },
+    cancelWarningAction() {
+      if (this.warnDialog) this.warnDialog.confirm = null;
+    },
+    async confirmWarningAction() {
+      const d = this.warnDialog;
+      if (!d || !d.confirm || d.busy || this.role !== "admin") return;
+      const { id, kind } = d.confirm;
+      d.busy = true;
+      d.actionError = "";
+      try {
+        if (kind === "lift") this.updateProfile(d.profile, await api.post(`/accounts/${d.profile.id}/warnings/${id}/lift`));
+        else await api.del(`/accounts/${d.profile.id}/warnings/${id}`);
+        const items = await api.get(`/accounts/${d.profile.id}/warnings`);
+        if (this.warnDialog === d) {
+          d.items = this.numberWarnings(items);
+          d.confirm = null;
+        }
+        this.notify(kind === "lift" ? "Warning lifted" : "Warning deleted");
+      } catch (e) {
+        if (this.warnDialog === d) d.actionError = e.message;
+      } finally {
+        if (this.warnDialog === d) d.busy = false;
       }
     },
     openAccountDialog(mode, profile) {
@@ -1705,6 +1963,7 @@ createApp({
       }
       this.notifOpen = false;
       if (this.locationWarn) this.cancelChangeLocation();
+      else if (this.warnDialog) this.closeWarnDialog();
       else if (this.accountDialog) this.closeAccountDialog();
       else if (this.rejectDialog) this.closeReject();
       else if (this.role === "resident" && this.page === "track" && this.trackSearched) this.closeTrack();

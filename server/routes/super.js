@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomInt } from "node:crypto";
 import { supabase } from "../utils/supabase.js";
 import { PLACE_SELECT, VERIFIED, check, fullName, httpError, placeOf, toDay } from "../utils/helpers.js";
-import { invalidateAccount, requireAuth, requireSuper } from "../middleware/auth.js";
+import { SECTIONS, invalidateAccount, requireAuth, requireSuper, staffSections } from "../middleware/auth.js";
 import { notifyAccount } from "../utils/notify.js";
 
 // Super Admin only (the "Admin" role). Account modification: list, create staff, reset password, delete.
@@ -23,7 +23,7 @@ const tempPassword = (length = 10) =>
   Array.from({ length }, () => TEMP_CHARS[randomInt(TEMP_CHARS.length)]).join("");
 
 const LIST_COLUMNS =
-  `account_id, first_name, middle_name, last_name, email, verification_status, deactivated_at, created_at, ${PLACE_SELECT}`;
+  `account_id, first_name, middle_name, last_name, email, verification_status, deactivated_at, created_at, role_id, permissions, ${PLACE_SELECT}`;
 
 const toRow = (a) => ({
   id: a.account_id,
@@ -33,6 +33,8 @@ const toRow = (a) => ({
   deactivated: Boolean(a.deactivated_at),
   created: toDay(a.created_at),
   ...placeOf(a),
+  // Staff only: the sections of the staff panel this account can use
+  ...(a.role_id === STAFF_ROLE_ID ? { sections: staffSections(a.permissions) } : {}),
 });
 
 // Search: letters, numbers and email characters only, so it can never break the filter below
@@ -139,6 +141,60 @@ router.post("/staff", requireAuth, requireSuper, async (req, res) => {
     throw httpError(400, `Couldn't create the account: ${profileError.message}`);
   }
   res.status(201).json({ account: toRow(row), temp_password: password });
+});
+
+// ---- Staff access: which sections of the staff panel one Staff account can use ----
+// The full row of ONE staff account (the staff page opened from the Staff list).
+async function staffRow(req) {
+  const target = await targetFor(req);
+  if (target.role_id !== STAFF_ROLE_ID) throw httpError(404, "Staff account not found.");
+  return check(
+    await supabase
+      .from("accounts")
+      .select(`*, ${PLACE_SELECT}`)
+      .eq("account_id", target.account_id)
+      .single(),
+  );
+}
+
+const toStaff = (a) => ({
+  ...toRow({ ...a, role_id: STAFF_ROLE_ID }),
+  first_name: a.first_name,
+  last_name: a.last_name,
+  brgy_id: a.brgy_id,
+  must_change_password: Boolean(a.must_change_password),
+  all_sections: SECTIONS, // every section that can be switched, in display order
+});
+
+router.get("/staff/:id", requireAuth, requireSuper, async (req, res) => {
+  res.json(toStaff(await staffRow(req)));
+});
+
+// Save the sections this Staff account may use. Body: { sections: ["announcements", ...] }
+//   - every section on  -> stored as NULL ("everything", also for sections added later)
+//   - none              -> an empty list: the staff member can sign in but can open nothing
+router.put("/staff/:id/permissions", requireAuth, requireSuper, async (req, res) => {
+  const staff = await staffRow(req);
+  const list = req.body?.sections;
+  if (!Array.isArray(list) || list.some((s) => typeof s !== "string")) {
+    throw httpError(400, "Send { sections: [...] } with the names of the sections to allow.");
+  }
+  const unknown = list.filter((s) => !SECTIONS.includes(s));
+  if (unknown.length) throw httpError(400, `Unknown section: ${unknown[0]}.`);
+
+  const allowed = SECTIONS.filter((s) => list.includes(s)); // no duplicates, fixed order
+  const permissions = allowed.length === SECTIONS.length ? null : allowed;
+
+  const updated = check(
+    await supabase
+      .from("accounts")
+      .update({ permissions })
+      .eq("account_id", staff.account_id)
+      .select(`*, ${PLACE_SELECT}`)
+      .single(),
+  );
+  invalidateAccount(staff.account_id); // takes effect on their very next request (not after the 30 s cache)
+  res.json(toStaff(updated));
 });
 
 // Temporary reset password: the old password stops working right away. The new one is returned once,
