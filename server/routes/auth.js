@@ -41,6 +41,7 @@ const tokens = (session) => ({
 
 async function signIn(email, password) {
   const { data, error } = await createAuthClient().auth.signInWithPassword({ email, password });
+  if (error) console.log("LOGIN FAIL:", error.status, error.code, error.message);
   if (error || !data.session) throw httpError(401, "Incorrect email or password.");
   return tokens(data.session);
 }

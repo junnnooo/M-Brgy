@@ -6,6 +6,41 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 3.1.0-b (MOBILE UPDATE PART 2)
+Mobile-first pass on the Resident side, segment (b): Home page.
+
+    (~) Changes in client/app/index.html and client/app/style.css only, app.js is not touched
+    (+) Added a time-based greeting on the Home page ("Good morning," / "Good afternoon," / "Good evening,") in small yellow text, with the resident's first name large and white below it (phones only)
+    (+) Added four quick-action tiles on Home: Request a document, Book a schedule, Track status, Report a concern (phones only)
+    (+) Added a notice on Home for residents who are not verified yet, explaining to visit the barangay hall with a valid ID (phones only, message only)
+    (+) Added a "Swipe to see more" hint under the announcement cards (phones only)
+    (+) Added a "See more…" prompt on announcement cards whose text is longer than the card, the whole card still opens Announcements (phones only)
+    (~) The headline "Get barangay business done from home." is a smaller supporting line under the name on phones
+    (~) The barangay name is a quiet outlined chip with a pin icon on phones, PC/laptop keeps the yellow plate
+    (~) The announcement board is now a swipeable row of cards on phones, all the same height with the text starting at the top, titles stop at 3 lines and the text at 2 lines. The pinned paper look stays on PC/laptop
+    (~) The Home hero is shorter on phones: the long intro text and the two buttons are hidden, the tiles replace them
+    (~) The four status numbers are now soft cards on phones, hall info is one rounded card
+    (~) Rounded corners and soft shadows on the resident Home for every screen size: barangay plate, hero buttons, announcement board and slips, tags, status numbers and the help panel
+    (-) The "Services for your community" list is hidden on phones, the quick-action tiles replace it. It is unchanged on PC/laptop
+    (~) Every new rule is scoped under .hero-wrap (resident Home only), nothing in the admin side or other resident pages changed
+    (~) Version tag is now ?v=3.1.0-b on style.css, api.js and app.js
+
+## Version: 3.1.0-a (MOBILE UPDATE PART 1)
+Mobile-first pass on the Resident side, done in segments. Phones only (640px and below), tablet and desktop are untouched.
+    Segment (a): Global shell
+
+    (~) Changes in client/app/index.html and client/app/style.css only, app.js is not touched
+    (+) Added a bottom navigation bar for residents on phones: Home, Updates (Announcements), Services, Track, Profile
+    (+) Added a "MOBILE APP LAYER" block at the very end of style.css, everything in it sits inside @media (max-width: 640px)
+    (+) Added viewport-fit=cover to the viewport meta tag so iPhones keep the bar above the home indicator
+    (~) The top bar is now one slim row on phones, the Home / Announcements / Services tabs moved to the bottom bar
+    (~) The avatar menu on phones only keeps Log out, Profile and Track Status moved to the bottom bar
+    (~) Bell and avatar buttons are now 44px on phones, the notification list never grows taller than the screen
+    (~) The emergency banner buttons are finger-sized on phones
+    (~) Less empty space on top of resident pages on phones
+    (~) The toast sits above the bottom bar, the bar hides while a text field is focused
+    (~) Version tag is now ?v=3.1.0-a on style.css, api.js and app.js
+
 ## Version: 3.0.0-e (MAJOR OVERHAUL UPDATE PART 5)
 
     (~) Huge Changes in client/app/index.html, client/app/api.js, client/app/app.js, client/app/sytle.css to accomodate new changes in the Admin Panel

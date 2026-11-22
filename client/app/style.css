@@ -3342,3 +3342,464 @@ tr.row-selected {
   font-size: 0.85rem;
   line-height: 1.3;
 }
+
+/* ==========================================================================
+   MOBILE APP LAYER (3.1.0-a) - phones only, resident side only.
+   Only the first rule sits outside the media query, and it just hides the
+   bottom bar. Desktop and tablet (above 640px) look exactly as before.
+   ========================================================================== */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* taps: no double-tap zoom delay, no grey flash */
+  button,
+  a,
+  select,
+  summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ---- top bar: one slim row (the tabs moved to the bottom bar) ---- */
+  header.resident-bar {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 8px max(var(--gutter), env(safe-area-inset-right)) 8px max(var(--gutter), env(safe-area-inset-left));
+  }
+  header.resident-bar .brand {
+    min-width: 0;
+    gap: 10px;
+  }
+  header.resident-bar .brand b {
+    font-size: 1.05rem;
+  }
+  header.resident-bar .desktop-nav {
+    display: none;
+  }
+  header.resident-bar .header-actions {
+    gap: 10px;
+    flex: none;
+  }
+  header.resident-bar .bell,
+  header.resident-bar .avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* account menu: Profile and Track live in the bottom bar now, so only Log out stays */
+  .user-menu > button[role="menuitem"]:not(.menu-logout),
+  .user-menu-sep {
+    display: none;
+  }
+  .user-menu > .menu-logout {
+    min-height: 48px;
+  }
+
+  /* ---- bottom navigation ---- */
+  .mobile-nav {
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: var(--white);
+    border-top: 2px solid var(--line);
+    box-shadow: 0 -6px 16px -10px rgba(15, 28, 61, 0.28);
+  }
+  .mobile-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 60px;
+    margin-top: -2px;
+    padding: 8px 2px 6px;
+    background: none;
+    border: 0;
+    border-top: 4px solid transparent;
+    color: var(--muted);
+    font: 700 0.75rem/1.1 var(--display);
+  }
+  .mobile-nav button.active {
+    color: var(--hall);
+    border-top-color: var(--sign);
+  }
+  .mobile-nav button:active {
+    background: var(--paper);
+  }
+  .mobile-nav svg {
+    flex: none;
+  }
+  /* while typing, give the screen back to the form */
+  #app:has(input:focus:not([type="checkbox"]):not([type="radio"]), textarea:focus, select:focus) > .mobile-nav {
+    display: none;
+  }
+
+  /* ---- notification panel: easier taps, never taller than the screen ---- */
+  .notif-head .text-link {
+    padding: 8px 4px;
+  }
+  .notif-item {
+    padding: 14px 16px;
+  }
+  .notif-list {
+    max-height: min(420px, calc(100dvh - 200px));
+  }
+
+  /* ---- emergency banner: finger-sized buttons ---- */
+  .emergency-banner .emergency-details {
+    min-height: 40px;
+  }
+  .emergency-banner .emergency-dismiss {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ---- page spacing: less empty space above the content ---- */
+  .page-container {
+    padding: 24px var(--gutter) 40px;
+  }
+  .page-title {
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+  }
+
+  /* ---- toast sits above the bottom bar ---- */
+  #app:has(.mobile-nav) .toast {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* ==========================================================================
+   RESIDENT HOME (3.1.0-b)
+   Part 1 - shape (every screen size): rounded corners and soft shadows.
+   Everything is scoped under .hero-wrap, which only the resident Home uses,
+   so no other page and no admin screen changes.
+   ========================================================================== */
+.hero-wrap .m-only {
+  display: none; /* phone-only pieces, switched on in the phone block below */
+}
+.hero-wrap .plate {
+  border-radius: 10px;
+}
+.hero-wrap .hero .btn,
+.hero-wrap .help-panel .btn {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.hero-wrap .board {
+  border-radius: 20px;
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6);
+}
+.hero-wrap .slip {
+  border-radius: 14px;
+  box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.6);
+}
+.hero-wrap .tag {
+  padding: 3px 11px;
+  border-radius: 999px;
+}
+.hero-wrap .quick-stats {
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px -18px rgba(15, 28, 61, 0.35);
+}
+.hero-wrap .help-panel {
+  border-radius: 20px;
+}
+
+/* Part 2 - phones only (640px and below) */
+@media (max-width: 640px) {
+  /* hero: shorter, the quick tiles do the job of the long text and the two buttons */
+  .hero-wrap .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding: 24px var(--gutter) 32px;
+  }
+  .hero-wrap .hero-copy,
+  .hero-wrap .board {
+    min-width: 0;
+  }
+  .hero-wrap .hero-copy > p,
+  .hero-wrap .hero-buttons {
+    display: none;
+  }
+  /* the hero text becomes a column, so phones can read: greeting, one line, place chip */
+  .hero-wrap .hero-copy {
+    display: flex;
+    flex-direction: column;
+  }
+  .hero-wrap .hello {
+    display: block;
+    order: 1;
+  }
+  .hero-wrap .hello small {
+    display: block;
+    color: var(--sign);
+    font: 700 1.1rem/1.2 var(--display);
+  }
+  .hero-wrap .hello b {
+    display: block;
+    margin-top: 2px;
+    color: var(--white);
+    font: 800 2.5rem/1.05 var(--display);
+    font-stretch: 110%;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+  .hero-wrap .hero h1 {
+    order: 2;
+    margin: 8px 0 16px;
+    color: #cbd7f2;
+    font: 400 1.1rem/1.4 var(--body);
+    font-stretch: 100%;
+    letter-spacing: 0;
+  }
+  .hero-wrap .plate {
+    order: 3;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 20px;
+    padding: 7px 14px 7px 10px;
+    background: transparent;
+    color: var(--white);
+    outline: 0;
+    border: 1.5px solid rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    font: 700 0.95rem/1.2 var(--display);
+    font-stretch: 100%;
+  }
+  .hero-wrap .plate::before {
+    content: "";
+    flex: none;
+    width: 18px;
+    height: 18px;
+    background: var(--sign);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .hero-wrap .verify-note {
+    order: 4;
+  }
+  .hero-wrap .quick-tiles {
+    order: 5;
+  }
+  .hero-wrap .hall-info {
+    order: 6;
+  }
+
+  /* notice for residents who are not verified yet */
+  .hero-wrap .verify-note {
+    display: block;
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    background: #fff8e0;
+    color: var(--ink);
+    border-left: 6px solid var(--sign);
+    border-radius: 14px;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  .hero-wrap .verify-note b {
+    display: block;
+    margin-bottom: 4px;
+    font: 800 1.05rem/1.2 var(--display);
+  }
+
+  /* quick actions */
+  .hero-wrap .quick-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 0 0 20px;
+  }
+  .quick-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 112px;
+    padding: 16px;
+    text-align: left;
+    background: var(--white);
+    color: var(--ink);
+    border: 0;
+    border-radius: 18px;
+    box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.55);
+    font: 800 1.05rem/1.2 var(--display);
+  }
+  .quick-tile:active {
+    transform: scale(0.98);
+  }
+  .quick-tile .qt-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    background: #e1e9fa;
+    color: var(--hall);
+    border-radius: 14px;
+  }
+  .quick-tile.primary {
+    background: var(--sign);
+  }
+  .quick-tile.primary .qt-icon {
+    background: var(--hall);
+    color: var(--white);
+  }
+
+  /* hall info as one soft card */
+  .hero-wrap .hall-info {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 0;
+    border-radius: 16px;
+  }
+  .hero-wrap .hall-info dt {
+    font-size: 1rem;
+  }
+
+  /* announcements: swipeable cards instead of pinned paper slips */
+  .hero-wrap .board {
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hero-wrap .board-head {
+    margin-bottom: 14px;
+    font-size: 1.25rem;
+  }
+  .hero-wrap .slip-row {
+    display: flex;
+    gap: 12px;
+    margin-inline: calc(var(--gutter) * -1);
+    padding: 4px var(--gutter) 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gutter);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .hero-wrap .slip-row::-webkit-scrollbar {
+    display: none;
+  }
+  .hero-wrap .slip-row .slip {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    flex: 0 0 82%;
+    width: auto;
+    margin: 0;
+    padding: 16px 16px 14px;
+    rotate: 0deg;
+    scroll-snap-align: start;
+    animation: none;
+    border-radius: 18px;
+  }
+  .hero-wrap .slip b {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .hero-wrap .see-more {
+    display: block;
+    margin-top: auto;
+    padding-top: 10px;
+    color: var(--hall);
+    font: 700 1rem/1.2 var(--display);
+  }
+  .hero-wrap .slip::before {
+    display: none;
+  }
+  .hero-wrap .slip.slip-alert {
+    border-top: 6px solid var(--tape);
+  }
+  .hero-wrap .slip p {
+    -webkit-line-clamp: 2;
+    font-size: 1rem;
+  }
+  .hero-wrap .slip small,
+  .hero-wrap .tag {
+    font-size: 0.95rem;
+  }
+  .hero-wrap .swipe-hint {
+    display: block;
+    max-width: none;
+    margin: 0 0 10px;
+    color: #9fb3e0;
+    font-size: 1rem;
+  }
+  .hero-wrap .board-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 48px;
+    margin: 6px 0 0;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    border-radius: 12px;
+    color: var(--white);
+    font: 700 1rem var(--display);
+    text-decoration: none;
+  }
+
+  /* status numbers: four soft cards */
+  .hero-wrap .quick-stats {
+    gap: 10px;
+    margin-top: 20px;
+    padding-inline: var(--gutter) !important;
+    overflow: visible;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hero-wrap .quick-stats > div {
+    padding: 14px 16px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .hero-wrap .quick-stats b {
+    font-size: 1.5rem;
+  }
+  .hero-wrap .quick-stats small {
+    display: block;
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  /* the tiles above replace this list on phones */
+  .hero-wrap .services-section {
+    display: none;
+  }
+  .hero-wrap .lower-grid {
+    padding-block: 24px 32px;
+  }
+  .hero-wrap .help-panel {
+    padding: 22px 20px;
+  }
+  .hero-wrap .help-panel h3 {
+    font-size: 1.4rem;
+  }
+  .hero-wrap .help-panel .btn {
+    width: 100%;
+  }
+}
