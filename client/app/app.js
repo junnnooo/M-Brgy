@@ -262,6 +262,9 @@ createApp({
       locationWarn: false,
       locationWarnTarget: "doc", // which form the warning is about: "doc" or "report"
 
+      isPhone: false, // phone-sized screen (640px and below), kept in sync in mounted()
+      expandedAnn: {}, // announcement cards opened on the Announcements page (phones show them collapsed)
+      annChipsHidden: false, // the sticky filter chips tuck away while scrolling far down (phones)
       notifOpen: false,
       menuOpen: false, // the avatar dropdown (Profile / Track Status / Log out)
       modal: "",
@@ -824,6 +827,57 @@ createApp({
       const m = this.munis(form).find((x) => x.municipality_id === form.municipality_id);
       return m ? m.barangays : [];
     },
+    // Announcements page: open/close a card, and jump here from a Home card
+    annKey(a) {
+      return a.kind + a.id;
+    },
+    isAnnExpanded(a) {
+      return !!this.expandedAnn[this.annKey(a)];
+    },
+    toggleAnnouncement(a) {
+      const k = this.annKey(a);
+      this.expandedAnn = { ...this.expandedAnn, [k]: !this.expandedAnn[k] };
+    },
+    // Phones: does this post have more to show than the collapsed card? (text length is a close-enough guess for 3 lines)
+    annLongBody(a) {
+      return (a.body || "").length > 105;
+    },
+    annHasMore(a) {
+      return this.annLongBody(a) || (a.title || "").length > 70;
+    },
+    // Phones: "Today", "Yesterday", "3d ago", then the date. Announcement dates are plain dates (no time).
+    relativeDate(d) {
+      if (!d) return "";
+      const day = (s) => new Date(`${String(s).slice(0, 10)}T12:00:00`);
+      const days = Math.round((day(todayString()) - day(d)) / 86400000);
+      if (days < 0) return this.formatDate(d);
+      if (days === 0) return "Today";
+      if (days === 1) return "Yesterday";
+      if (days < 7) return `${days}d ago`;
+      const sameYear = day(d).getFullYear() === day(todayString()).getFullYear();
+      return day(d).toLocaleDateString("en-PH", sameYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+    },
+    async openAnnouncement(item) {
+      const k = this.annKey(item);
+      this.announcementFilter = "All";
+      this.expandedAnn = { ...this.expandedAnn, [k]: true };
+      this.page = "announcements";
+      await this.$nextTick();
+      const el = [...document.querySelectorAll("[data-ann]")].find((e) => e.dataset.ann === k);
+      if (!el) return;
+      const header = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 64;
+      const chips = this.isPhone ? 68 : 0; // the sticky filter chips on phones
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - header - chips - 12, behavior: "smooth" });
+    },
+    // Display only: the place names for a form's chosen location, e.g. "Lantic (Barangay 13), City Of Carmona, Cavite"
+    locationSummary(form) {
+      const prov = this.locations.find((p) => p.province_id === form.province_id);
+      const muni = this.munis(form).find((m) => m.municipality_id === form.municipality_id);
+      const brgy = this.brgys(form).find((b) => b.brgy_id === form.brgy_id);
+      return [brgy && brgy.brgy_name, muni && muni.municipality_name, prov && prov.province_name]
+        .filter(Boolean)
+        .join(", ");
+    },
     findLocation(brgyId) {
       for (const p of this.locations)
         for (const m of p.municipalities) {
@@ -1055,12 +1109,6 @@ createApp({
         await this.loadServices(this.documentForm.brgy_id);
       }
     },
-    async openAppointment() {
-      await this.openDocument();
-      const clearance = this.services.find((s) => s.service_name === "Barangay Clearance");
-      if (clearance) this.documentForm.service_type_ids = [clearance.service_type_id];
-      this.documentForm.purpose = "Appointment / document processing";
-    },
     // Checkbox rules for the document picker: never more than the barangay allows
     docPickDisabled(id) {
       const ids = this.documentForm.service_type_ids;
@@ -1169,6 +1217,13 @@ createApp({
       const seq = ++this.trackSeq;
       this.trackSearched = true;
       this.trackedItem = null;
+      // Phones: bring the result into view (the Track buttons in the lists are far below it)
+      if (this.isPhone) {
+        this.$nextTick(() => {
+          const box = document.querySelector(".tracking-result");
+          if (box) box.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
       const ref = parseRef(this.trackId);
       const kind = ref?.type === "10" ? "document" : ref?.type === "20" || ref?.type === "21" ? "report" : "";
       if (!kind) return;
@@ -1950,6 +2005,26 @@ createApp({
   mounted() {
     // Landing page "Sign Up" button opens this page with ?mode=signup
     if (new URLSearchParams(location.search).get("mode") === "signup") this.authMode = "signup";
+    const phoneQuery = window.matchMedia("(max-width: 640px)");
+    this.isPhone = phoneQuery.matches;
+    phoneQuery.addEventListener("change", (e) => (this.isPhone = e.matches));
+    // Announcements page on phones: the sticky filter chips hide when scrolling down far, and come back on the way up
+    let lastScrollY = window.scrollY;
+    window.addEventListener(
+      "scroll",
+      () => {
+        const y = window.scrollY;
+        if (this.page !== "announcements" || !this.isPhone) {
+          if (this.annChipsHidden) this.annChipsHidden = false;
+        } else if (y > lastScrollY + 6 && y > 400) {
+          this.annChipsHidden = true;
+        } else if (y < lastScrollY - 6 || y < 200) {
+          this.annChipsHidden = false;
+        }
+        lastScrollY = y;
+      },
+      { passive: true },
+    );
     document.addEventListener("click", (e) => {
       if (this.notifOpen && !e.target.closest(".notif-wrap")) this.notifOpen = false;
       if (this.menuOpen && !e.target.closest(".user-wrap")) this.menuOpen = false;

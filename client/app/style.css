@@ -3671,80 +3671,19 @@ tr.row-selected {
     font-size: 1rem;
   }
 
-  /* announcements: swipeable cards instead of pinned paper slips */
-  .hero-wrap .board {
-    max-width: none;
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .hero-wrap .board-head {
-    margin-bottom: 14px;
-    font-size: 1.25rem;
-  }
-  .hero-wrap .slip-row {
-    display: flex;
-    gap: 12px;
-    margin-inline: calc(var(--gutter) * -1);
-    padding: 4px var(--gutter) 10px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: var(--gutter);
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .hero-wrap .slip-row::-webkit-scrollbar {
-    display: none;
-  }
-  .hero-wrap .slip-row .slip {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    flex: 0 0 82%;
-    width: auto;
-    margin: 0;
-    padding: 16px 16px 14px;
-    rotate: 0deg;
-    scroll-snap-align: start;
-    animation: none;
-    border-radius: 18px;
-  }
+  /* announcement board: the same pinned paper board as PC/laptop, showing category, date and title */
   .hero-wrap .slip b {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .hero-wrap .see-more {
-    display: block;
-    margin-top: auto;
-    padding-top: 10px;
-    color: var(--hall);
-    font: 700 1rem/1.2 var(--display);
-  }
-  .hero-wrap .slip::before {
-    display: none;
-  }
-  .hero-wrap .slip.slip-alert {
-    border-top: 6px solid var(--tape);
-  }
   .hero-wrap .slip p {
-    -webkit-line-clamp: 2;
-    font-size: 1rem;
+    display: none;
   }
   .hero-wrap .slip small,
   .hero-wrap .tag {
     font-size: 0.95rem;
-  }
-  .hero-wrap .swipe-hint {
-    display: block;
-    max-width: none;
-    margin: 0 0 10px;
-    color: #9fb3e0;
-    font-size: 1rem;
   }
   .hero-wrap .board-all {
     display: flex;
@@ -3801,5 +3740,981 @@ tr.row-selected {
   }
   .hero-wrap .help-panel .btn {
     width: 100%;
+  }
+}
+
+/* ==========================================================================
+   SERVICES, DOCUMENT REQUEST AND REPORT PAGES (3.1.0-c)
+   Part 1 - shape (every screen size): same rounded corners and soft shadows
+   as the Home. Scoped under .svc-page, which only these three resident
+   pages use, so nothing else changes.
+   ========================================================================== */
+.svc-page .step-title,
+.svc-page .loc-summary,
+.svc-page .bar-note,
+.svc-page .svc-icon {
+  display: none; /* phone-only pieces, switched on in the phone block below */
+}
+.svc-page .form-step,
+.svc-page .submit-bar {
+  display: contents; /* no wrapper box on PC/laptop: the layout stays as it was */
+}
+
+.svc-page .form-card {
+  border-radius: 20px;
+  box-shadow: 0 14px 34px -22px rgba(15, 28, 61, 0.35);
+}
+.svc-page .form-card input,
+.svc-page .form-card select,
+.svc-page .form-card textarea {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.svc-page .location-picker,
+.svc-page .doc-picker {
+  border-radius: 16px;
+}
+.svc-page .form-card .check-option {
+  min-height: 52px;
+  border-radius: 12px;
+}
+/* keep the real checkbox size: the input rule above gives every input a minimum height */
+.svc-page .form-card .check-option input[type="checkbox"] {
+  min-height: 0;
+}
+.svc-page .form-note {
+  border-radius: 12px;
+}
+.svc-page .notice-card {
+  border-radius: 16px;
+}
+.svc-page .panel {
+  border-radius: 20px;
+}
+.svc-page .btn {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.svc-page .small-action {
+  min-height: 40px;
+  border-radius: 10px;
+}
+.svc-page .status-pill {
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.svc-page .service-grid {
+  gap: 14px;
+  border-bottom: 0;
+}
+.svc-page .service-card {
+  padding: 22px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px -20px rgba(15, 28, 61, 0.4);
+}
+.svc-page .service-card:hover {
+  background: var(--sign);
+  border-color: var(--sign);
+}
+
+/* Part 2 - phones only (640px and below) */
+@media (max-width: 640px) {
+  .svc-page {
+    --nav-h: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  /* title area */
+  .svc-page .back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-bottom: 8px;
+  }
+  .svc-page .page-title {
+    margin-bottom: 20px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .svc-page .page-title h1 {
+    font-size: 1.9rem;
+  }
+
+  /* services: icon rows */
+  .svc-page .service-card {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    grid-template-areas: "i t c" "i d c";
+    column-gap: 14px;
+    row-gap: 2px;
+    padding: 16px;
+  }
+  .svc-page .service-card > b {
+    font-size: 1.15rem;
+    font-stretch: 100%;
+  }
+  .svc-page .service-card > p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .svc-page .service-card .card-link {
+    display: none;
+  }
+  .svc-page .svc-icon {
+    grid-area: i;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    background: #e1e9fa;
+    color: var(--hall);
+    border-radius: 16px;
+  }
+  .svc-page .service-card::after {
+    content: "›";
+    grid-area: c;
+    color: var(--muted);
+    font: 400 2rem/1 var(--display);
+  }
+
+  /* forms: every step is its own soft card */
+  .svc-page .form-card {
+    counter-reset: step;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .svc-page .form-step {
+    display: block;
+    margin-bottom: 14px;
+    padding: 18px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: 0 10px 26px -20px rgba(15, 28, 61, 0.4);
+  }
+  .svc-page .form-step > :last-child,
+  .svc-page .form-step .form-two > :last-child {
+    margin-bottom: 0;
+  }
+  .svc-page .step-title,
+  .svc-page .location-head h3,
+  .svc-page .doc-picker legend {
+    counter-increment: step;
+    font: 800 1.15rem/1.2 var(--display);
+  }
+  .svc-page .step-title {
+    display: block;
+    margin: 0 0 14px;
+  }
+  .svc-page .step-title::before,
+  .svc-page .location-head h3::before,
+  .svc-page .doc-picker legend::before {
+    content: counter(step);
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 10px;
+    background: var(--sign);
+    color: var(--ink);
+    border-radius: 50%;
+    font: 800 0.95rem/1 var(--display);
+    vertical-align: middle;
+  }
+  .svc-page .form-card label {
+    margin-bottom: 16px;
+    font-size: 1rem;
+  }
+  .svc-page .form-card input,
+  .svc-page .form-card select,
+  .svc-page .form-card textarea {
+    min-height: 52px;
+  }
+  .svc-page .form-card input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+
+  /* location: one line when it comes from the resident's barangay */
+  .svc-page .location-picker {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .svc-page .location-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 0;
+  }
+  .svc-page .location-head h3 {
+    margin: 0 0 6px;
+  }
+  .svc-page .location-head p {
+    font-size: 1rem;
+  }
+  .svc-page .loc-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    background: #eef3fc;
+    color: var(--ink);
+    border-radius: 14px;
+    font: 700 1.05rem/1.3 var(--display);
+  }
+  .svc-page .loc-summary::before {
+    content: "";
+    flex: none;
+    width: 20px;
+    height: 20px;
+    background: var(--hall);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .svc-page .location-head .small-action,
+  .svc-page .location-head .text-link {
+    align-self: flex-start;
+    min-height: 44px;
+  }
+  .svc-page .form-three {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .svc-page .form-three.is-locked {
+    display: none;
+  }
+
+  /* document types: big tappable rows */
+  .svc-page .doc-picker {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .svc-page .doc-picker legend {
+    float: left;
+    width: 100%;
+    margin: 0 0 12px;
+    padding: 0;
+  }
+  .svc-page .doc-picker legend + * {
+    clear: both;
+  }
+  .svc-page .doc-picker legend .muted {
+    display: block;
+    margin: 4px 0 0 38px;
+    font: 400 1rem/1.3 var(--body);
+  }
+  .svc-page .form-card .check-option {
+    min-height: 58px;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: 1.05rem;
+  }
+  .svc-page .form-card .check-option input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+  }
+  .svc-page .doc-picker > small {
+    display: block;
+    margin-top: 4px;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  /* pickup time: tappable chips instead of a dropdown */
+  .svc-page .field-group {
+    margin: 0 0 16px;
+  }
+  .svc-page .field-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .svc-page .time-chips {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .svc-page .form-card .time-chip {
+    position: relative;
+    margin: 0;
+  }
+  .svc-page .form-card .time-chip input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .svc-page .time-chip span {
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    padding: 6px 4px;
+    background: var(--white);
+    border: 2px solid var(--field);
+    border-radius: 12px;
+    font: 700 1rem/1.15 var(--display);
+    text-align: center;
+  }
+  .svc-page .time-chip input:checked + span {
+    background: var(--hall);
+    border-color: var(--hall);
+    color: var(--white);
+  }
+  .svc-page .time-chip input:focus-visible + span {
+    outline: 3px solid var(--sign);
+    outline-offset: 2px;
+  }
+
+  /* note + submit: the button stays in reach above the bottom bar */
+  .svc-page .form-note {
+    margin: 0 0 14px;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  .svc-page .submit-bar {
+    position: sticky;
+    bottom: calc(var(--nav-h) + 8px);
+    z-index: 20;
+    display: block;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: 0 -8px 24px -14px rgba(15, 28, 61, 0.4), 0 10px 26px -18px rgba(15, 28, 61, 0.4);
+  }
+  .svc-page .submit-bar .btn {
+    width: 100%;
+    min-height: 54px;
+    font-size: 1.1rem;
+  }
+  .svc-page .bar-note {
+    display: block;
+    margin: 0 0 8px;
+    color: var(--tape);
+    font-weight: 700;
+    text-align: center;
+  }
+  /* keyboard open: the bottom bar hides, so the button drops down */
+  #app:has(input:focus:not([type="checkbox"]):not([type="radio"]), textarea:focus, select:focus) .svc-page .submit-bar {
+    bottom: 8px;
+  }
+
+  /* lists under the forms */
+  .svc-page .below-panel {
+    padding: 18px;
+  }
+  .svc-page .record-row {
+    align-items: flex-start;
+  }
+  .svc-page .status-pill {
+    font-size: 0.9rem;
+  }
+
+  /* Home: with Appointments gone there are 3 tiles, so the first one goes full width */
+  .hero-wrap .quick-tile.primary {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 84px;
+  }
+}
+
+/* ==========================================================================
+   ANNOUNCEMENTS PAGE (3.1.0-d)
+   Part 1 - shape (every screen size). Scoped under .ann-page, which only
+   the resident Announcements page uses.
+   ========================================================================== */
+.ann-page .post-head,
+.ann-page .post-more {
+  display: none; /* phone-only pieces */
+}
+.ann-page .post-text {
+  display: contents; /* no wrapper box on PC/laptop */
+}
+.ann-page .filter-chip {
+  border-radius: 999px;
+}
+.ann-page .announcement-card {
+  border-radius: 18px;
+  box-shadow: 0 10px 26px -20px rgba(15, 28, 61, 0.4);
+}
+.ann-page .tag {
+  padding: 3px 11px;
+  border-radius: 999px;
+}
+
+/* Part 2 - phones only (640px and below): post-style cards */
+@media (max-width: 640px) {
+  .ann-page .page-title {
+    margin-bottom: 14px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .ann-page .page-title h1 {
+    font-size: 1.9rem;
+  }
+
+  /* filter chips: one row, pinned under the top bar, tucked away when scrolling far down */
+  .ann-page .filter-row {
+    position: sticky;
+    top: calc(var(--header-h, 64px) - 1px);
+    z-index: 30;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 0 calc(var(--gutter) * -1) 12px;
+    padding: 10px var(--gutter);
+    overflow-x: auto;
+    background: var(--paper);
+    box-shadow: 0 8px 14px -12px rgba(15, 28, 61, 0.4);
+    scrollbar-width: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .ann-page .filter-row::-webkit-scrollbar {
+    display: none;
+  }
+  .ann-page .filter-row.is-hidden {
+    transform: translateY(-110%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ann-page .filter-chip {
+    flex: none;
+    min-height: 44px;
+    padding: 8px 18px;
+    font-size: 1rem;
+  }
+
+  /* each announcement reads like a post: who, when, then the words */
+  .ann-page .announcement-list {
+    gap: 12px;
+  }
+  .ann-page .announcement-card {
+    position: relative;
+    padding: 14px 16px 16px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ann-page .announcement-card:active {
+    background: #f7f9fd;
+  }
+  .ann-page .announcement-card-top {
+    display: none; /* the tag and date move into the post header */
+  }
+  .ann-page .post-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .ann-page .post-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    overflow: hidden;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+  }
+  .ann-page .post-avatar img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+  }
+  .ann-page .post-who {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+  .ann-page .post-who b {
+    overflow: hidden;
+    font: 800 1.05rem/1.2 var(--display);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ann-page .post-who small {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.3;
+  }
+  .ann-page .ann-chevron {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-right: -8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    color: var(--hall);
+  }
+  .ann-page .ann-chevron svg {
+    transition: transform 0.2s ease;
+  }
+  .ann-page .announcement-card.expanded .ann-chevron svg {
+    transform: rotate(180deg);
+  }
+
+  .ann-page .announcement-card h3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    margin: 0 0 8px;
+    overflow: hidden;
+    font-size: 1.2rem;
+    line-height: 1.25;
+  }
+  .ann-page .announcement-card.expanded h3 {
+    display: block;
+    overflow: visible;
+  }
+  .ann-page .post-text {
+    display: block;
+    position: relative;
+  }
+  .ann-page .announcement-card p {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    margin: 0;
+    overflow: hidden;
+    font-size: 1.05rem;
+    line-height: 1.55;
+  }
+  .ann-page .announcement-card.expanded p {
+    display: block;
+    overflow: visible;
+  }
+  /* "See more" sits at the end of the last visible line, like a post */
+  .ann-page .post-more {
+    display: block;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding-left: 32px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), var(--white) 45%);
+    color: var(--hall);
+    font: 700 1.05rem/1.55 var(--body);
+  }
+  .ann-page .announcement-card.expanded .post-more {
+    position: static;
+    padding: 8px 0 0;
+    background: none;
+  }
+
+  /* emergency: pinned to the top of the list while it is live */
+  .ann-page .announcement-card.is-emergency {
+    order: -1;
+    background: #fff6f6;
+    border-color: #f1c4c8;
+    border-left-color: var(--tape);
+  }
+  .ann-page .announcement-card.is-emergency .post-more {
+    background: linear-gradient(to right, rgba(255, 246, 246, 0), #fff6f6 45%);
+  }
+  .ann-page .announcement-card.is-emergency.expanded .post-more {
+    background: none;
+  }
+  .ann-page .announcement-card.is-emergency .post-who small {
+    color: var(--tape);
+    font-weight: 700;
+  }
+  .ann-page .pin-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--tape);
+    font: 800 0.9rem/1 var(--display);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .ann-page .pin-label::before {
+    content: "";
+    flex: none;
+    width: 16px;
+    height: 16px;
+    background: var(--tape);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M9 3h6l-1 7 3 3v2H7v-2l3-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5'/%3E%3Cpath d='M9 3h6l-1 7 3 3v2H7v-2l3-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+
+/* ==========================================================================
+   TRACK STATUS, PROFILE AND USER GUIDE (3.1.0-e)
+   Part 1 - shape (every screen size). Scoped under .me-page, which only
+   these three resident pages use.
+   ========================================================================== */
+.me-page .profile-links {
+  display: none; /* phones only */
+}
+.me-page .form-card {
+  border-radius: 20px;
+  box-shadow: 0 14px 34px -22px rgba(15, 28, 61, 0.35);
+}
+.me-page .form-card input,
+.me-page .form-card select,
+.me-page .form-card textarea,
+.me-page .status-select {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.me-page .btn {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.me-page .panel {
+  border-radius: 20px;
+}
+.me-page .notice-card {
+  border-radius: 16px;
+}
+.me-page .profile-status {
+  border-radius: 20px;
+  box-shadow: 0 10px 26px -20px rgba(15, 28, 61, 0.4);
+}
+.me-page .status-pill {
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.me-page .reject-box {
+  border-radius: 14px;
+}
+.me-page .tracking-close {
+  min-height: 40px;
+  border-radius: 10px;
+}
+.me-page .see-toggle {
+  min-height: 44px;
+  border-radius: 12px;
+}
+.me-page .manual-card > span {
+  border-radius: 12px;
+}
+
+/* Part 2 - phones only (640px and below) */
+@media (max-width: 640px) {
+  .me-page .page-title {
+    margin-bottom: 18px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .me-page .page-title h1 {
+    font-size: 1.9rem;
+  }
+  .me-page .form-card label {
+    margin-bottom: 16px;
+    font-size: 1rem;
+  }
+  .me-page .form-card input,
+  .me-page .form-card select {
+    min-height: 52px;
+  }
+  .me-page .form-three {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  /* ---- Track status ---- */
+  .me-page .track-form > .btn {
+    min-height: 54px;
+    font-size: 1.1rem;
+  }
+  .me-page .tracking-result {
+    scroll-margin-top: calc(var(--header-h, 64px) + 12px);
+  }
+  .me-page .tracking-close {
+    min-height: 44px;
+    padding: 6px 14px;
+  }
+  .me-page .tracking-result .record-heading {
+    flex-direction: column-reverse; /* status first, it is what people look for */
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .me-page .tracking-result .status-pill {
+    padding: 6px 14px;
+    font-size: 1rem;
+  }
+  .me-page .record-heading .eyebrow {
+    font-size: 0.9rem;
+  }
+  .me-page .track-ref {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font: 600 0.95rem/1.35 var(--body);
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+  }
+  .me-page .tracking-result h3 {
+    font-size: 1.45rem;
+    line-height: 1.2;
+  }
+  .me-page .tracking-location {
+    padding: 12px 14px;
+    background: #eef3fc;
+    border-radius: 14px;
+    color: var(--ink);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  .me-page .tracking-location small {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+  .me-page .reject-box {
+    padding: 14px 16px;
+    font-size: 1rem;
+  }
+
+  /* timeline: bigger steps, the current one stands out */
+  .me-page .timeline-step {
+    gap: 16px;
+    padding-bottom: 26px;
+  }
+  .me-page .timeline-step > span {
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+  }
+  .me-page .timeline-step:not(:last-child)::before {
+    left: 18px;
+    top: 40px;
+    width: 3px;
+  }
+  .me-page .timeline-step b {
+    font-size: 1.1rem;
+  }
+  .me-page .timeline-step small {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .me-page .timeline-step:not(.complete) b {
+    color: var(--muted);
+  }
+  .me-page .timeline-step.complete.current > span {
+    background: var(--sign);
+    border-color: var(--ink);
+    color: var(--ink);
+    box-shadow: 0 0 0 4px rgba(255, 199, 44, 0.35);
+  }
+  .me-page .timeline-step.current:not(:last-child)::before {
+    background: var(--line);
+  }
+  .me-page .timeline-step.current b {
+    font-size: 1.2rem;
+  }
+  .me-page .timeline-step.current small {
+    color: var(--ink);
+  }
+
+  /* my requests / my reports lists */
+  .me-page .below-panel {
+    margin-top: 16px;
+    padding: 18px;
+  }
+  .me-page .below-panel h3 {
+    font-size: 1.3rem;
+  }
+  .me-page .status-dropdown {
+    margin: 8px 0 12px;
+  }
+  .me-page .status-select {
+    flex: 1 1 100%;
+    max-width: none;
+    min-height: 52px;
+  }
+  .me-page .record-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "info info" "pill link";
+    gap: 10px 12px;
+    align-items: center;
+    padding: 14px 0;
+  }
+  .me-page .record-row > div:first-child {
+    grid-area: info;
+  }
+  .me-page .record-row .status-pill {
+    grid-area: pill;
+    justify-self: start;
+    font-size: 0.9rem;
+  }
+  .me-page .record-row .text-link {
+    grid-area: link;
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+    min-height: 44px;
+    font-size: 1rem;
+  }
+  .me-page .record-row b {
+    font-size: 1.1rem;
+  }
+  .me-page .record-row small {
+    font-size: 1rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .me-page .see-toggle {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  /* ---- Profile ---- */
+  .me-page.profile-page {
+    display: flex;
+    flex-direction: column;
+  }
+  .me-page .profile-status {
+    order: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 24px 20px 20px;
+    text-align: center;
+  }
+  .me-page .profile-avatar {
+    width: 84px;
+    height: 84px;
+    margin-bottom: 6px;
+    box-shadow: 0 0 0 4px var(--sign);
+    font-size: 2.2rem;
+  }
+  .me-page .profile-status h3 {
+    font-size: 1.4rem;
+  }
+  .me-page .profile-status p {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+  .me-page .profile-status .status-pill {
+    margin: 10px 0 0;
+    padding: 6px 16px;
+    font-size: 1rem;
+  }
+  /* the verification notice: same look as on Home, on top for pending residents, hidden once verified */
+  .me-page .notice-card {
+    order: 2;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    background: #fff8e0;
+    border: 0;
+    border-left: 6px solid var(--sign);
+    border-radius: 14px;
+  }
+  .me-page .notice-card.is-verified {
+    display: none;
+  }
+  .me-page .notice-card p {
+    margin: 4px 0 0;
+    color: var(--ink);
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  .me-page .notice-symbol {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+  .me-page.profile-page .form-card {
+    order: 3;
+    padding: 18px;
+  }
+  .me-page .form-card .btn-wide {
+    min-height: 54px;
+    font-size: 1.1rem;
+  }
+  .me-page .profile-links {
+    display: grid;
+    order: 4;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .me-page .profile-links button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 12px 16px;
+    background: var(--white);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 10px 26px -20px rgba(15, 28, 61, 0.4);
+    font: 700 1.05rem var(--display);
+    text-align: left;
+  }
+  .me-page .profile-links button > span {
+    flex: 1;
+  }
+  .me-page .profile-links button svg:first-child {
+    color: var(--hall);
+  }
+  .me-page .profile-links button svg:last-child:not(:first-child) {
+    color: var(--muted);
+  }
+  .me-page .profile-links button.logout,
+  .me-page .profile-links button.logout svg {
+    color: var(--tape);
+  }
+  .me-page .profile-links button.logout {
+    border-color: #f1c4c8;
+  }
+
+  /* ---- User guide ---- */
+  .me-page .manual-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 14px;
+    padding-bottom: 24px;
+  }
+  .me-page .manual-card:not(:last-child)::before {
+    left: 21px;
+    top: 44px;
+  }
+  .me-page .manual-card > span {
+    width: 44px;
+    height: 44px;
+    font-size: 1.05rem;
+  }
+  .me-page .manual-card h3 {
+    margin: 8px 0 4px;
+    font-size: 1.2rem;
+  }
+  .me-page .manual-card p {
+    font-size: 1.05rem;
+    line-height: 1.5;
   }
 }

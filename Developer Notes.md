@@ -6,6 +6,53 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 3.1.0-e (MOBILE UPDATE PART 5)
+Mobile-first pass on the Resident side, segment (e): Track Status, Profile (My account) and the User guide.
+
+    (~) Changes in client/app/index.html, style.css and app.js (one small addition in app.js)
+    (~) Track status on phones: bigger field and Track button. The result shows the status first, then the request type and its reference number on its own line, then the details. The timeline has bigger steps, the current step is highlighted in yellow, steps still to come are greyed, and a rejected request shows a clear red box
+    (~) My document requests / My concern reports on phones: each row shows the title and reference on top, the status pill and a large "Track →" below, and the status filter is full width
+    (+) app.js: on phones, tapping "Track →" (or Track) scrolls to the tracking result. Before, the result opened above the lists and was out of sight
+    (~) Profile on phones: a centered header with a large avatar, name, email and verification status. The name fields are stacked
+    (~) The verification notice on Profile now looks like the Home one on phones. Pending residents see it at the top, verified residents don't see it. PC/laptop still shows it at the bottom for everyone
+    (+) Added "User guide" and "Log out" rows at the bottom of Profile on phones
+    (~) User guide on phones: slightly smaller number badges so the text has more room, text is 16px or larger
+    (~) The Profile tab in the bottom bar stays highlighted while reading the User guide, since the guide now opens from Profile
+    (~) Rounded corners and soft shadows on Track status, Profile and the User guide for every screen size: cards, inputs, buttons, panels, notices, status pills and the number badges
+    (~) Every new rule is scoped under .me-page (these three pages only), nothing in the admin side or other resident pages changed
+    (~) Version tag is now ?v=3.1.0-e on style.css, api.js and app.js
+
+## Version: 3.1.0-d (MOBILE UPDATE PART 4)
+Mobile-first pass on the Resident side, segment (d): Announcements.
+
+    (~) Changes in client/app/index.html, style.css and app.js (small additions, listed below)
+    (~) Announcement cards on phones show only the category, the date posted and the title. Tap a card (or its arrow) to open the full text, tap again to close it. PC/laptop still shows the full text
+    (~) Home announcement cards on phones now show only category, date and title too (the text and the "See more…" prompt from 3.1.0-b are gone). Tapping one opens the Announcements tab, scrolled to that announcement and already opened
+    (~) The filter chips (All, Announcement, Schedule, Emergency) are one scrollable row on phones, pinned under the top bar. They hide when scrolling far down and come back when scrolling up
+    (+) Emergency announcements are pinned to the top of the list on phones while they are live, with a red edge, a light red background and a "Pinned" label
+    (~) Rounded corners and soft shadows on the Announcements page for every screen size: cards, tags and filter chips
+    (+) app.js: added expandedAnn, annChipsHidden, annKey(), isAnnExpanded(), toggleAnnouncement(), openAnnouncement(item) and a scroll listener in mounted(). On PC/laptop, tapping a Home slip now also scrolls to that announcement on the Announcements page
+    (~) Every new rule is scoped under .ann-page (this page only), nothing in the admin side or other resident pages changed
+    (~) Version tag is now ?v=3.1.0-d on style.css, api.js and app.js
+
+## Version: 3.1.0-c (MOBILE UPDATE PART 3)
+Mobile-first pass on the Resident side, segment (c): Services, Document request and Report a concern pages.
+
+    (~) Changes in client/app/index.html, style.css and app.js (small additions, listed below)
+    (-) Removed Appointments everywhere on the resident side: the "Schedule an appointment" card on Services, the "Appointments" card and "Book a schedule" tile on Home, the openAppointment() function in app.js, and the wording about booking appointments in the Home notice, help panel, Services intro and user guide. The pickup date and time inside the document request form stay, they are part of the request
+    (~) Services page on phones: the three cards are icon rows with a chevron (Barangay document, Concern or incident report, Track a request or report)
+    (~) Document request and Report forms on phones: every step is its own rounded card with a numbered header (Location, Document type, Your request, Pickup schedule / What happened?)
+    (+) Added a collapsed location line on phones, e.g. "Lantic (Barangay 13), City Of Carmona, Cavite", when the location comes from the resident's registered barangay. "Change location" still asks first and then shows the three dropdowns
+    (~) Document types are large tappable rows on phones (58px, 24px checkboxes)
+    (+) Added tappable time chips on phones instead of the "Preferred time" dropdown, same field and same values. PC/laptop keeps the dropdown
+    (+) Added a sticky "Submit" bar on phones that stays above the bottom bar, it drops down while the keyboard is open
+    (~) Inputs, dropdowns and the textarea are at least 52px tall on phones, text is 16px or larger
+    (~) Rounded corners and soft shadows on these three pages for every screen size: form cards, inputs, location box, document picker, notices, panels, buttons, status pills and the Services cards
+    (~) Home quick tiles on phones: with Appointments gone there are three, "Request a document" is full width
+    (+) app.js: added isPhone (set in mounted()) and locationSummary(form), both display only. They do not change what is submitted
+    (~) Every new rule is scoped under .svc-page (these three pages only), nothing in the admin side or other resident pages changed
+    (~) Version tag is now ?v=3.1.0-c on style.css, api.js and app.js
+
 ## Version: 3.1.0-b (MOBILE UPDATE PART 2)
 Mobile-first pass on the Resident side, segment (b): Home page.
 
