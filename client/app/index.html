@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=3.1.0-e" />
+  <link rel="stylesheet" href="style.css?v=3.1.0-f" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
@@ -139,7 +139,7 @@
               <label>Temporary password
                 <span class="pw-field">
                   <input v-model="changeForm.current" :type="showPw.cpCurrent ? 'text' : 'password'" required autocomplete="current-password" placeholder="The temporary password you were given" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.cpCurrent}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpCurrent')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpCurrent}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('cpCurrent')">
                     <svg v-if="!showPw.cpCurrent" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -149,7 +149,7 @@
               <label>New password
                 <span class="pw-field">
                   <input v-model="changeForm.next" :type="showPw.cpNew ? 'text' : 'password'" required :minlength="minPassword" autocomplete="new-password" placeholder="At least 8 characters" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.cpNew}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpNew')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpNew}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('cpNew')">
                     <svg v-if="!showPw.cpNew" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -160,7 +160,7 @@
               <label>Confirm new password
                 <span class="pw-field">
                   <input v-model="changeForm.confirm" :type="showPw.cpConfirm ? 'text' : 'password'" required autocomplete="new-password" placeholder="Type the new password again" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.cpConfirm}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('cpConfirm')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.cpConfirm}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('cpConfirm')">
                     <svg v-if="!showPw.cpConfirm" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -187,19 +187,24 @@
 
   </main>
 
-  <main v-else-if="!role" class="auth-page">
+  <main v-else-if="!role" class="auth-page auth-login">
     <section class="auth-shell">
 
       <aside class="auth-side">
         <div class="plate">{{settings.name}}</div>
-        <h1>Log in to your barangay account.</h1>
-        <p>Residents can request documents and report concerns. Barangay officials review and update them. Log in with your account to continue.</p>
+        <h1 class="auth-pc-title">Log in to your barangay account.</h1>
+        <h1 class="auth-phone-title">{{ authMode==='login' ? 'Log in to your barangay account.' : 'Join your barangay community.' }}</h1>
+        <p class="auth-pc-text">{{ authMode==='login' ? 'Residents can request documents and report concerns. Barangay officials review and update them. Log in with your account to continue.' : 'Create an account to request documents, report concerns and follow updates.' }}</p>
       </aside>
 
       <div class="auth-main">
         <div class="auth-card">
 
           <div class="auth-pane">
+            <div class="auth-seg" role="group" aria-label="Log in or sign up">
+              <button type="button" :class="{active: authMode==='login'}" :aria-pressed="authMode==='login' ? 'true' : 'false'" @click="setAuthMode('login')">Log in</button>
+              <button type="button" :class="{active: authMode==='signup'}" :aria-pressed="authMode==='signup' ? 'true' : 'false'" @click="setAuthMode('signup')">Sign up</button>
+            </div>
             <h2>{{authMode==='login' ? 'Account Log in' : 'Create a resident account'}}</h2>
             <p class="muted">{{authMode==='login' ? 'Log in to request documents, report concerns, and follow updates.' : 'Sign up with your email. You can add your address and contact number after logging in.'}}</p>
 
@@ -212,7 +217,7 @@
               <label>Password
                 <span class="pw-field">
                   <input v-model="loginForm.password" :type="showPw.login ? 'text' : 'password'" required autocomplete="current-password" placeholder="Your password" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.login}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('login')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.login}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('login')">
                     <svg v-if="!showPw.login" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -252,7 +257,7 @@
               <label>Password
                 <span class="pw-field">
                   <input v-model="signupForm.password" :type="showPw.signup ? 'text' : 'password'" required :minlength="minPassword" autocomplete="new-password" placeholder="At least 8 characters" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.signup}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('signup')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.signup}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('signup')">
                     <svg v-if="!showPw.signup" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -263,7 +268,7 @@
               <label>Confirm password
                 <span class="pw-field">
                   <input v-model="signupForm.confirm" :type="showPw.confirm ? 'text' : 'password'" required autocomplete="new-password" placeholder="Type the password again" />
-                  <button type="button" class="pw-eye" :class="{on:showPw.confirm}" aria-label="Hold to show password" title="Hold to show password" v-on="pwEvents('confirm')">
+                  <button type="button" class="pw-eye" :class="{on:showPw.confirm}" :aria-label="isPhone ? 'Show or hide password' : 'Hold to show password'" :title="isPhone ? 'Tap to show or hide password' : 'Hold to show password'" v-on="pwEvents('confirm')">
                     <svg v-if="!showPw.confirm" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
                   </button>
@@ -276,7 +281,7 @@
 
             </form>
 
-            <p class="auth-switch">{{authMode==='login' ? 'New to kaBRGY?' : 'Already have an account?'}}
+            <p class="auth-switch auth-pc-text">{{authMode==='login' ? 'New to kaBRGY?' : 'Already have an account?'}}
               <button type="button" class="text-link" @click="setAuthMode(authMode==='login'?'signup':'login')">
                 {{authMode==='login' ? 'Create a resident account' : 'Log in instead'}}
               </button>
@@ -2322,7 +2327,7 @@
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <span>Track</span>
     </button>
-    <button type="button" :class="{active:page==='account'}" :aria-current="(page==='account') ? 'page' : null" @click="notifOpen=false; menuGo('account')">
+    <button type="button" :class="{active:page==='account' || page==='manual'}" :aria-current="(page==='account' || page==='manual') ? 'page' : null" @click="notifOpen=false; menuGo('account')">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
       <span>Profile</span>
     </button>
@@ -2503,7 +2508,7 @@
     </form>
   </div>
 
-  <div v-if="warningAck && role==='resident' && !resident.deactivated && !mustChange" class="modal-backdrop" role="presentation">
+  <div v-if="warningAck && role==='resident' && !resident.deactivated && !mustChange" class="modal-backdrop sheet" role="presentation">
     <div class="success-modal warning-modal" role="alertdialog" aria-modal="true">
       <div class="success-mark warning-mark">!</div>
       <h2>Account warning {{resident.warnings.length}} of {{maxWarnings}}</h2>
@@ -2515,7 +2520,7 @@
     </div>
   </div>
 
-  <div v-if="locationWarn" class="modal-backdrop" @click.self="cancelChangeLocation" role="presentation">
+  <div v-if="locationWarn" class="modal-backdrop sheet" @click.self="cancelChangeLocation" role="presentation">
     <div class="success-modal confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="loc-warn-title" aria-describedby="loc-warn-desc">
       <div class="success-mark confirm-mark">!</div>
       <h2 id="loc-warn-title">Change service location?</h2>
@@ -2550,7 +2555,7 @@
   
   </div>
 
-  <div v-if="modal" class="modal-backdrop" @click.self="modal=''" @keydown.esc="modal=''" role="presentation">
+  <div v-if="modal" class="modal-backdrop sheet" @click.self="modal=''" @keydown.esc="modal=''" role="presentation">
     
     <div class="success-modal">
       
@@ -2575,8 +2580,8 @@
 
 </div>
 
-<script src="api.js?v=3.1.0-e"></script>
-<script src="app.js?v=3.1.0-e"></script>
+<script src="api.js?v=3.1.0-f"></script>
+<script src="app.js?v=3.1.0-f"></script>
 
 </body>
 </html>

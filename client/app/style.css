@@ -4718,3 +4718,343 @@ tr.row-selected {
     line-height: 1.5;
   }
 }
+
+/* ==========================================================================
+   LOGIN / SIGN-UP, POP-UPS AND DEACTIVATED SCREEN (3.1.0-f)
+   Part 1 - every screen size. Only the resident pop-ups (.sheet) and the
+   resident deactivated screen get the rounded shape. The login page is shared
+   with staff/admin, so on PC/laptop it stays exactly as it was.
+   ========================================================================== */
+.auth-seg,
+.auth-phone-title {
+  display: none; /* phone-only pieces */
+}
+.modal-backdrop.sheet .success-modal {
+  border-radius: 20px;
+}
+.modal-backdrop.sheet .reference-box {
+  border-radius: 14px;
+}
+.modal-backdrop.sheet .reference-box button {
+  min-height: 40px;
+  border-radius: 10px;
+}
+.modal-backdrop.sheet .btn {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.deactivated-page .form-card,
+.deactivated-page .reason-box,
+.deactivated-page .appeal-status {
+  border-radius: 16px;
+}
+
+/* Part 2 - phones only (640px and below) */
+@media (max-width: 640px) {
+  /* ---- login / sign-up: a compact header, the form is visible straight away ---- */
+  .auth-shell {
+    min-height: 0;
+  }
+  .auth-side {
+    padding: 20px var(--gutter) 24px;
+    border-right: 0;
+    border-bottom: 8px solid var(--sign);
+  }
+  .auth-side .plate {
+    margin-bottom: 14px;
+    font-size: 0.95rem;
+  }
+  .auth-side h1 {
+    max-width: none;
+    margin-bottom: 0;
+    font-size: 1.9rem;
+    line-height: 1.1;
+  }
+  .auth-pc-title,
+  .auth-pc-text {
+    display: none;
+  }
+  .auth-phone-title {
+    display: block;
+  }
+  .auth-main {
+    padding: 20px var(--gutter) 32px;
+  }
+  .auth-card {
+    border-radius: 20px;
+    box-shadow: 0 14px 34px -22px rgba(15, 28, 61, 0.35);
+  }
+  .auth-pane {
+    padding: 18px 18px 22px;
+  }
+  .auth-seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 18px;
+    padding: 4px;
+    background: #eef3fc;
+    border-radius: 16px;
+  }
+  .auth-seg button {
+    min-height: 48px;
+    background: none;
+    border: 0;
+    border-radius: 12px;
+    color: var(--muted);
+    font: 700 1.05rem var(--display);
+  }
+  .auth-seg button.active {
+    background: var(--white);
+    color: var(--hall);
+    box-shadow: 0 4px 12px -6px rgba(15, 28, 61, 0.4);
+  }
+  /* the segmented switch already says which form this is, so the heading stays for screen readers only */
+  .auth-seg + h2 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .auth-pane > .muted {
+    margin-bottom: 18px;
+    font-size: 1rem;
+  }
+  .auth-form label {
+    margin-bottom: 16px;
+    font-size: 1rem;
+  }
+  .auth-form input,
+  .auth-form select {
+    min-height: 52px;
+    border-radius: 12px;
+  }
+  .auth-form .pw-field input {
+    padding-right: 56px;
+  }
+  .pw-eye {
+    width: 52px;
+    border-radius: 12px;
+  }
+  .char-count {
+    font-size: 0.95rem;
+  }
+  .auth-error {
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+  .auth-form .btn-wide {
+    min-height: 54px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+  }
+
+  /* ---- resident pop-ups: bottom sheets ---- */
+  .modal-backdrop.sheet {
+    place-items: end center;
+    padding: 0;
+  }
+  .modal-backdrop.sheet .success-modal {
+    width: 100%;
+    max-height: 92dvh;
+    padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-top: 6px solid var(--sign);
+    border-radius: 24px 24px 0 0;
+    animation: sheet-up 0.28s ease-out;
+  }
+  @keyframes sheet-up {
+    from {
+      translate: 0 100%;
+    }
+    to {
+      translate: 0 0;
+    }
+  }
+  .modal-backdrop.sheet .modal-close {
+    top: 12px;
+    right: 12px;
+    width: 44px;
+    height: 44px;
+    font-size: 1.9rem;
+  }
+  .modal-backdrop.sheet .success-mark {
+    width: 60px;
+    height: 60px;
+  }
+  .modal-backdrop.sheet .success-modal h2 {
+    font-size: 1.5rem;
+  }
+  .modal-backdrop.sheet .success-modal p,
+  .modal-backdrop.sheet .warning-list li {
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .modal-backdrop.sheet .reference-box {
+    margin: 18px 0;
+    padding: 16px;
+    border-radius: 16px;
+  }
+  .modal-backdrop.sheet .reference-box b {
+    font-size: 1.3rem;
+  }
+  .modal-backdrop.sheet .reference-box button {
+    flex: 1 1 100%;
+    min-height: 48px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+  }
+  .modal-backdrop.sheet .btn {
+    width: 100%;
+    min-height: 54px;
+    font-size: 1.1rem;
+  }
+  .modal-backdrop.sheet .confirm-actions {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  /* ---- deactivated account screen ---- */
+  .deactivated-page h1 {
+    font-size: 1.6rem;
+    line-height: 1.2;
+  }
+  .deactivated-page .form-card textarea {
+    min-height: 120px;
+  }
+  .deactivated-page .btn {
+    min-height: 54px;
+    border-radius: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop.sheet .success-modal {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   LOGIN / SIGN-UP ON PC AND TABLET (3.1.0-f)
+   The same style as the phone version: Log in | Sign up switch, rounded card,
+   bigger fields. PC/laptop keeps its two columns. Scoped under .auth-login
+   (the shared login page), so the temporary-password page is not touched.
+   ========================================================================== */
+@media (min-width: 641px) {
+  .auth-login .auth-pc-title {
+    display: none;
+  }
+  .auth-login .auth-phone-title {
+    display: block; /* the headline follows the form */
+  }
+  .auth-login .auth-switch {
+    display: none; /* the switch at the top of the card replaces this link */
+  }
+  .auth-login .auth-card {
+    border-radius: 20px;
+    box-shadow: 0 14px 34px -22px rgba(15, 28, 61, 0.35);
+  }
+  .auth-login .auth-pane {
+    padding: 22px 24px 26px;
+  }
+  .auth-login .auth-seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 20px;
+    padding: 4px;
+    background: #eef3fc;
+    border-radius: 16px;
+  }
+  .auth-login .auth-seg button {
+    min-height: 48px;
+    background: none;
+    border: 0;
+    border-radius: 12px;
+    color: var(--muted);
+    font: 700 1.05rem var(--display);
+    cursor: pointer;
+  }
+  .auth-login .auth-seg button:hover {
+    color: var(--hall);
+  }
+  .auth-login .auth-seg button.active {
+    background: var(--white);
+    color: var(--hall);
+    box-shadow: 0 4px 12px -6px rgba(15, 28, 61, 0.4);
+  }
+  .auth-login .auth-seg + h2 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .auth-login .auth-pane > .muted {
+    margin-bottom: 18px;
+    font-size: 1rem;
+  }
+  .auth-login .auth-form label {
+    margin-bottom: 16px;
+    font-size: 1rem;
+  }
+  .auth-login .auth-form input,
+  .auth-login .auth-form select {
+    min-height: 52px;
+    border-radius: 12px;
+  }
+  .auth-login .auth-form .pw-field input {
+    padding-right: 56px;
+  }
+  .auth-login .pw-eye {
+    width: 52px;
+    border-radius: 12px;
+  }
+  .auth-login .char-count {
+    font-size: 0.95rem;
+  }
+  .auth-login .auth-error {
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+  .auth-login .auth-form .btn-wide {
+    min-height: 54px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+  }
+}
+
+/* tablet: the same stacked layout as the phone, card centered */
+@media (min-width: 641px) and (max-width: 960px) {
+  .auth-login .auth-side {
+    padding: 28px var(--gutter);
+  }
+  .auth-login .auth-side .plate {
+    margin-bottom: 14px;
+  }
+  .auth-login .auth-side h1 {
+    max-width: none;
+    margin-bottom: 0;
+    font-size: 2.2rem;
+    line-height: 1.1;
+  }
+  .auth-login .auth-side p {
+    display: none;
+  }
+  .auth-login .auth-main {
+    padding: 28px var(--gutter) 40px;
+  }
+  .auth-login .auth-card {
+    width: min(520px, 100%);
+  }
+}

@@ -902,6 +902,10 @@ createApp({
     // Hold-to-reveal for password fields: shows while pressed, hides on release / leave / blur
     pwEvents(key) {
       const set = (on) => { this.showPw[key] = on; };
+      // Phones: tap to show, tap again to hide (press-and-hold is awkward on a touch screen)
+      if (this.isPhone) {
+        return { click: () => { this.showPw[key] = !this.showPw[key]; } };
+      }
       return {
         pointerdown: (e) => { e.preventDefault(); set(true); }, // preventDefault keeps focus in the input
         pointerup: () => set(false),

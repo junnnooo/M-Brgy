@@ -6,6 +6,21 @@ as well as the remarks each developers had after their own update.
 
 This will serve as a guide for other developers!
 
+## Version: 3.1.0-f (MOBILE UPDATE PART 6)
+Mobile-first pass on the Resident side, segment (f): login / sign-up, pop-ups and the deactivated screen. This finishes the resident mobile pass.
+
+    (~) Changes in client/app/index.html, style.css and app.js (one small change in app.js)
+    (~) Login / sign-up on phones: a compact navy header so the form shows right away. The headline follows the form ("Log in to your barangay account." / "Join your barangay community.") and the long paragraph is hidden
+    (~) Login / sign-up on PC/laptop and tablet now use the same style: the "Log in | Sign up" switch, a rounded card with a soft shadow, 52px rounded fields and a 54px button. PC/laptop keeps its two columns (navy panel on the left, form on the right), tablet (960px and below) uses the stacked phone layout with the card centered. The headline follows the form on every size, and the PC panel text follows it too: sign-up shows "Create an account to request documents, report concerns and follow updates."
+    (~) There is only one login page for residents and admins, so staff and admin accounts get the same look. It is scoped under .auth-login
+    (+) Added a "Log in | Sign up" switch at the top of the form (all screen sizes). The "New to kaBRGY? / Already have an account?" link at the bottom is hidden
+    (~) Inputs, dropdowns and buttons on the login and sign-up forms are 52-54px tall on phones, the character counters are bigger, the form card is rounded
+    (~) app.js: the password eye is tap to show / tap again to hide on phones (pwEvents). PC/laptop keeps press-and-hold. The eye buttons' labels follow the same rule
+    (~) The resident pop-ups (success with reference number, "Change service location?", account warning) are bottom sheets on phones: they slide up from the bottom, rounded top corners, full-width 54px buttons, bigger Close button, and a full-width Copy button for the reference number. They are centered boxes on PC/laptop, now with rounded corners
+    (~) Deactivated account screen: rounded boxes, bigger appeal field and button on phones
+    (~) The admin and staff pop-ups, the password-change page for temporary passwords on PC/laptop and everything inside the admin side are not changed
+    (~) Version tag is now ?v=3.1.0-f on style.css, api.js and app.js
+
 ## Version: 3.1.0-e (MOBILE UPDATE PART 5)
 Mobile-first pass on the Resident side, segment (e): Track Status, Profile (My account) and the User guide.
 
